@@ -1,0 +1,9 @@
+
+#board-analysis-board .piece.wq,
+#board-analysis-board .promotion-piece.wq,
+#board-analysis-board .vfx .element.wq {
+  background-image: var(--custom-wq) !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+}

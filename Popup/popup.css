@@ -1,0 +1,140 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  width: 360px;
+  padding: 20px;
+  font-family: Inter, sans-serif;
+  background: #f6d9c9;
+}
+
+.top-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff2e9);
+  color: #202020;
+  box-shadow: inset 0 0 14px rgba(255,255,255,0.2);
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+h2 {
+  margin-top: 16px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.set {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: transparent;
+  transition: 0.3s;
+}
+
+.set button {
+  background: white;
+}
+
+.set.festive {
+  background: linear-gradient(135deg,#365d9f,#7c152d);
+  box-shadow: inset 0 0 18px rgba(255,255,255,0.15);
+}
+
+.set.disabled {
+  opacity: 0.5;
+}
+
+.set.active {
+  outline: 2px solid rgba(124,21,45,0.6);
+  box-shadow: 0 0 18px rgba(124,21,45,0.35);
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.set.festive button {
+  background: linear-gradient(135deg,#365d9f,#7c152d);
+  color: #f1d1c8;
+  box-shadow: inset 0 0 12px rgba(255,255,255,0.25);
+}
+
+button:active {
+  transform: scale(0.95);
+}
+
+.preview {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: inherit;
+}
+
+.preview.light { background: #e9d0c1; }
+.preview.dark  { background: #3b2b32; }
+
+.preview img {
+  width: 36px;
+  transition: transform 0.2s cubic-bezier(.25,.9,.25,.1);
+}
+
+.preview img:hover {
+  transform: translateY(-14px) scale(1.7);
+  animation: shake 0.4s;
+}
+
+@keyframes shake {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  50% { transform: rotate(-2deg); }
+  75% { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Toggle */
+.switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+}
+.switch input { display:none; }
+.slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: .3s;
+}
+.slider:before {
+  content:"";
+  position:absolute;
+  height:20px;
+  width:20px;
+  left:3px;
+  bottom:3px;
+  background:white;
+  border-radius:50%;
+  transition:.3s;
+}
+input:checked + .slider {
+  background:#7c152d;
+}
+input:checked + .slider:before {
+  transform:translateX(20px);
+}
