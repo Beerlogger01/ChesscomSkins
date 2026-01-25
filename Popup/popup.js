@@ -13,22 +13,25 @@ chrome.storage.sync.get(["enabled", "activeSet"], data => {
 
 toggle.addEventListener("change", () => {
   if (!toggle.checked) {
-    chrome.storage.sync.set({ enabled: false, activeSet: null });
+    chrome.storage.sync.set({ enabled: false });
     updateUI(false);
-    setActiveUI(null);
   } else {
-    chrome.storage.sync.set({ enabled: true, activeSet: null });
-    updateUI(true);
-    setActiveUI(null);
+    chrome.storage.sync.get("activeSet", (data) => {
+      chrome.storage.sync.set({ enabled: true });
+      updateUI(true);
+      setActiveUI(data.activeSet || null);
+    });
   }
 });
 
 sets.forEach(set => {
+  const setName = set.dataset.set;
+
   set.querySelector("button").addEventListener("click", () => {
     if (!toggle.checked) return;
 
-    chrome.storage.sync.set({ activeSet: set.id }, () => {
-      setActiveUI(set.id);
+    chrome.storage.sync.set({ activeSet: setName }, () => {
+      setActiveUI(setName);
     });
   });
 });
@@ -41,6 +44,6 @@ function updateUI(enabled) {
 
 function setActiveUI(activeID) {
   sets.forEach(set => {
-    set.classList.toggle("active", activeID && set.id === activeID);
+    set.classList.toggle("active", activeID && set.dataset.set === activeID);
   });
 }

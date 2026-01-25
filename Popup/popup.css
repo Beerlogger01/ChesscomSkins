@@ -94,6 +94,26 @@ button:active {
   transition: transform 0.2s cubic-bezier(.25,.9,.25,.1);
 }
 
+.preview-ember img {
+  filter: hue-rotate(-18deg) saturate(1.5) drop-shadow(0 0 6px rgba(255,120,40,0.8));
+}
+
+.preview-frost img {
+  filter: hue-rotate(180deg) saturate(1.4) drop-shadow(0 0 6px rgba(120,200,255,0.9));
+}
+
+.preview-neon img {
+  filter: hue-rotate(280deg) saturate(1.8) drop-shadow(0 0 6px rgba(210,120,255,0.9));
+}
+
+.preview-legendary img {
+  filter: saturate(1.1) drop-shadow(0 0 6px rgba(255,140,80,0.8));
+}
+
+.preview-minimal img {
+  filter: saturate(1.02) drop-shadow(0 0 4px rgba(255,255,255,0.4));
+}
+
 .preview img:hover {
   transform: translateY(-14px) scale(1.7);
   animation: shake 0.4s;

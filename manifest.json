@@ -4,7 +4,7 @@
   "name": "Chess.com Custom Skins",
   "version": "1.0",
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "Popup/popup.html"
   },
   "permissions": ["storage"],
   "content_scripts": [
