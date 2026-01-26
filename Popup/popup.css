@@ -30,12 +30,21 @@ h2 {
   font-weight: 500;
 }
 
+.preview-window {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .set {
-  margin-top: 14px;
-  padding: 14px;
+  padding: 12px;
   border-radius: 18px;
   background: transparent;
   transition: 0.3s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .set button {
@@ -66,6 +75,10 @@ button {
   transition: 0.2s;
 }
 
+.set-toggle {
+  font-weight: 600;
+}
+
 .set.festive button {
   background: linear-gradient(135deg,#365d9f,#7c152d);
   color: #f1d1c8;
@@ -77,17 +90,44 @@ button:active {
 }
 
 .preview {
-  margin-top: 12px;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
   background: inherit;
+  overflow: hidden;
 }
 
 .preview.light { background: #e9d0c1; }
 .preview.dark  { background: #3b2b32; }
+
+.preview::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(10, 10, 10, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.set:hover .preview::after {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 .preview img {
   width: 36px;
