@@ -298,6 +298,10 @@ function handleMoveEvent(reason) {
   const board = getBoardElement();
   if (!board) return;
   ensureOverlay(board);
+  if (!overlayRoot) {
+    warn("Overlay missing; cannot spawn cracks");
+    return;
+  }
 
   const san = extractLatestSAN();
   const lastMoveSquares = findLastMoveSquares();
@@ -467,12 +471,15 @@ chrome.storage.onChanged.addListener((changes) => {
   }
   if (changes.cracksEnabled) {
     cracksEnabled = !!changes.cracksEnabled.newValue;
+    if (cracksEnabled && overlaysEnabled && !boardObserver) {
+      bootstrap();
+    }
   }
 });
 
 const readyObserver = new MutationObserver(() => {
   const board = getBoardElement();
-  if (board && overlaysEnabled) {
+  if (board && overlaysEnabled && overlayBoard !== board) {
     bootstrap();
   }
 });
