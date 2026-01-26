@@ -416,6 +416,14 @@ function applyCracks(enabled) {
 
 function ensureCrackStyles() {
   if (crackStyleTag) return;
+  const crackSvg = encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+      <path d="M12 40 L35 32 L48 46 L62 38 L76 52 L95 44" stroke="rgba(40,25,15,0.75)" stroke-width="2.4" fill="none"/>
+      <path d="M20 78 L38 70 L52 82 L70 74 L88 90" stroke="rgba(50,30,18,0.7)" stroke-width="2.2" fill="none"/>
+      <path d="M58 18 L62 34 L54 46 L64 64 L58 82" stroke="rgba(35,20,12,0.6)" stroke-width="2" fill="none"/>
+      <path d="M90 18 L76 32 L80 46 L70 58 L78 76" stroke="rgba(35,20,12,0.55)" stroke-width="1.8" fill="none"/>
+    </svg>`
+  );
   crackStyleTag = document.createElement("style");
   crackStyleTag.textContent = `
     .cracked-square {
@@ -426,24 +434,25 @@ function ensureCrackStyles() {
     .cracked-square::after {
       content: "";
       position: absolute;
-      inset: 6%;
+      inset: 4%;
       pointer-events: none;
       background-image:
-        linear-gradient(130deg, rgba(60,40,20,0.65) 0 1px, transparent 1px 100%),
-        linear-gradient(45deg, rgba(60,40,20,0.5) 0 1px, transparent 1px 100%),
-        linear-gradient(300deg, rgba(60,40,20,0.45) 0 1px, transparent 1px 100%),
-        linear-gradient(90deg, rgba(60,40,20,0.35) 0 1px, transparent 1px 100%);
+        url("data:image/svg+xml,${crackSvg}"),
+        radial-gradient(circle at 30% 35%, rgba(70,45,25,0.35) 0%, transparent 55%),
+        radial-gradient(circle at 70% 70%, rgba(60,35,20,0.3) 0%, transparent 55%);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
       mix-blend-mode: multiply;
       opacity: 0;
-      transform: scale(0.95);
+      transform: scale(0.9);
       animation: crackFade 3.2s ease-out forwards;
     }
 
     @keyframes crackFade {
-      0% { opacity: 0; transform: scale(0.95); }
-      20% { opacity: 0.9; transform: scale(1); }
-      70% { opacity: 0.7; }
-      100% { opacity: 0; transform: scale(1.05); }
+      0% { opacity: 0; transform: scale(0.9); }
+      15% { opacity: 1; transform: scale(1); }
+      65% { opacity: 0.75; }
+      100% { opacity: 0; transform: scale(1.04); }
     }
   `;
   document.head.appendChild(crackStyleTag);
