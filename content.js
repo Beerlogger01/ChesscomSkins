@@ -1,4 +1,3 @@
-
 const PIECES = [
   "wk","wq","wr","wb","wn","wp",
   "bk","bq","br","bb","bn","bp"
@@ -66,6 +65,11 @@ let overlayStyleTag = null;
 let skinsEnabled = false;
 let activeSkinPath = null;
 let capturedObserver = null;
+let crackStyleTag = null;
+let cracksEnabled = false;
+let crackObserver = null;
+const crackTimers = new Map();
+const CRACK_DURATION_MS = 3200;
 
 function applySkin(skinName, skinPath) {
   if (lastAppliedSkin === skinName && activeSkinPath === skinPath) return;
@@ -397,8 +401,100 @@ function disableSkins() {
   lastAppliedTarget = null;
 }
 
+function applyCracks(enabled) {
+  cracksEnabled = enabled;
+  if (!enabled) {
+    removeCrackStyles();
+    removeCrackObservers();
+    clearCrackTimers();
+    return;
+  }
+  ensureCrackStyles();
+  ensureCrackObserver();
+  applyCracksToLastMove();
+}
+
+function ensureCrackStyles() {
+  if (crackStyleTag) return;
+  crackStyleTag = document.createElement("style");
+  crackStyleTag.textContent = `
+    .cracked-square {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cracked-square::after {
+      content: "";
+      position: absolute;
+      inset: 6%;
+      pointer-events: none;
+      background-image:
+        linear-gradient(130deg, rgba(60,40,20,0.65) 0 1px, transparent 1px 100%),
+        linear-gradient(45deg, rgba(60,40,20,0.5) 0 1px, transparent 1px 100%),
+        linear-gradient(300deg, rgba(60,40,20,0.45) 0 1px, transparent 1px 100%),
+        linear-gradient(90deg, rgba(60,40,20,0.35) 0 1px, transparent 1px 100%);
+      mix-blend-mode: multiply;
+      opacity: 0;
+      transform: scale(0.95);
+      animation: crackFade 3.2s ease-out forwards;
+    }
+
+    @keyframes crackFade {
+      0% { opacity: 0; transform: scale(0.95); }
+      20% { opacity: 0.9; transform: scale(1); }
+      70% { opacity: 0.7; }
+      100% { opacity: 0; transform: scale(1.05); }
+    }
+  `;
+  document.head.appendChild(crackStyleTag);
+}
+
+function removeCrackStyles() {
+  if (crackStyleTag) crackStyleTag.remove();
+  crackStyleTag = null;
+}
+
+function ensureCrackObserver() {
+  if (crackObserver) return;
+  crackObserver = new MutationObserver(() => applyCracksToLastMove());
+  crackObserver.observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class"]
+  });
+}
+
+function removeCrackObservers() {
+  if (crackObserver) {
+    crackObserver.disconnect();
+    crackObserver = null;
+  }
+}
+
+function applyCracksToLastMove() {
+  if (!cracksEnabled) return;
+  const squares = document.querySelectorAll(".last-move");
+  squares.forEach((square) => {
+    if (square.classList.contains("cracked-square")) return;
+    square.classList.add("cracked-square");
+    const timer = setTimeout(() => {
+      square.classList.remove("cracked-square");
+      crackTimers.delete(square);
+    }, CRACK_DURATION_MS);
+    crackTimers.set(square, timer);
+  });
+}
+
+function clearCrackTimers() {
+  crackTimers.forEach((timerId) => clearTimeout(timerId));
+  crackTimers.clear();
+  document.querySelectorAll(".cracked-square").forEach((square) => {
+    square.classList.remove("cracked-square");
+  });
+}
+
 chrome.storage.sync.get(
-  ["enabled", "activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "activeSet"],
+  ["enabled", "activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "activeSet", "cracksEnabled"],
   (data) => {
   skinsEnabled = !!data.enabled;
   if (!skinsEnabled) return;
@@ -418,19 +514,24 @@ chrome.storage.sync.get(
 
   applySkin(activeSkin || "set2", skinPath || null);
   applyEffect(activeEffect || "native-ember", activeTarget);
+  applyCracks(!!data.cracksEnabled);
 });
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled && changes.enabled.newValue === false) {
     skinsEnabled = false;
     disableSkins();
+    applyCracks(false);
   }
 
   if (changes.enabled && changes.enabled.newValue === true) {
     skinsEnabled = true;
-    chrome.storage.sync.get(["activeSkin", "activeEffect", "activeTarget", "activeSkinPath"], (data) => {
+    chrome.storage.sync.get(
+      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "cracksEnabled"],
+      (data) => {
       applySkin(data.activeSkin || "set2", data.activeSkinPath || null);
       applyEffect(data.activeEffect || "native-ember", data.activeTarget || "all");
+      applyCracks(!!data.cracksEnabled);
     });
   }
 
@@ -468,6 +569,16 @@ chrome.storage.onChanged.addListener((changes) => {
         chrome.storage.sync.get("activeEffect", (stored) => {
           applyEffect(stored.activeEffect || "native-ember", changes.activeTarget.newValue);
         });
+      }
+    });
+  }
+
+  if (changes.cracksEnabled) {
+    chrome.storage.sync.get("enabled", (data) => {
+      if (data.enabled) {
+        applyCracks(!!changes.cracksEnabled.newValue);
+      } else {
+        applyCracks(false);
       }
     });
   }

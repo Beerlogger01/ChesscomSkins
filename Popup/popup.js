@@ -1,8 +1,13 @@
-
 const toggle = document.getElementById("toggle");
-const sets = document.querySelectorAll(".set");
+const skinSets = document.querySelectorAll('.set[data-type="skin"]');
+const effectKings = document.querySelectorAll(".effect-king");
 const effectPreviewImages = document.querySelectorAll(".effect-preview");
-let currentActiveSet = null;
+const targetButtons = document.querySelectorAll(".target-button");
+const cracksButton = document.querySelector(".cracks-button");
+let currentActiveSkin = null;
+let currentActiveEffect = null;
+let currentTarget = "all";
+let cracksEnabled = false;
 
 const SKIN_PREVIEW_SOURCES = {
   set2: "../assets/Set2/wk.png"
@@ -15,7 +20,9 @@ function updateEffectPreviews(activeSkin) {
   });
 }
 
-chrome.storage.sync.get(["enabled", "activeSet", "activeSkin", "activeEffect"], data => {
+chrome.storage.sync.get(
+  ["enabled", "activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled"],
+  data => {
   toggle.checked = !!data.enabled;
   updateUI(toggle.checked);
 
@@ -23,9 +30,15 @@ chrome.storage.sync.get(["enabled", "activeSet", "activeSkin", "activeEffect"], 
   const activeSkin = data.activeSkin && data.activeSkin !== "none" ? data.activeSkin : null;
   const activeEffect = data.activeEffect && data.activeEffect !== "none" ? data.activeEffect : null;
 
-  currentActiveSet = activeSet || activeEffect || activeSkin || null;
-  setActiveUI(currentActiveSet);
-  updateEffectPreviews(activeSkin || "set2");
+  currentActiveSkin = activeSkin || (activeSet && skinSets.length ? activeSet : null);
+  currentActiveEffect = activeEffect;
+  currentTarget = data.activeTarget || "all";
+  cracksEnabled = !!data.cracksEnabled;
+  setActiveSkinUI(currentActiveSkin);
+  setActiveEffectUI(currentActiveEffect);
+  setActiveTargetUI(currentTarget);
+  setCracksUI(cracksEnabled);
+  updateEffectPreviews(currentActiveSkin || "set2");
 });
 
 toggle.addEventListener("change", () => {
@@ -33,55 +46,127 @@ toggle.addEventListener("change", () => {
     chrome.storage.sync.set({ enabled: false });
     updateUI(false);
   } else {
-    chrome.storage.sync.get(["activeSet", "activeSkin", "activeEffect"], (data) => {
+    chrome.storage.sync.get(
+      ["activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled"],
+      (data) => {
       chrome.storage.sync.set({ enabled: true });
       updateUI(true);
       const activeSet = data.activeSet && data.activeSet !== "none" ? data.activeSet : null;
       const activeSkin = data.activeSkin && data.activeSkin !== "none" ? data.activeSkin : null;
       const activeEffect = data.activeEffect && data.activeEffect !== "none" ? data.activeEffect : null;
-      currentActiveSet = activeSet || activeEffect || activeSkin || null;
-      setActiveUI(currentActiveSet);
-      updateEffectPreviews(activeSkin || "set2");
+      currentActiveSkin = activeSkin || (activeSet && skinSets.length ? activeSet : null);
+      currentActiveEffect = activeEffect;
+      currentTarget = data.activeTarget || "all";
+      cracksEnabled = !!data.cracksEnabled;
+      setActiveSkinUI(currentActiveSkin);
+      setActiveEffectUI(currentActiveEffect);
+      setActiveTargetUI(currentTarget);
+      setCracksUI(cracksEnabled);
+      updateEffectPreviews(currentActiveSkin || "set2");
     });
   }
 });
 
-sets.forEach(set => {
+skinSets.forEach(set => {
   const setName = set.dataset.set;
-  const setType = set.dataset.type;
+  const button = set.querySelector("button");
+  if (!button) return;
 
-  set.querySelector("button").addEventListener("click", () => {
+  button.addEventListener("click", () => {
     if (!toggle.checked) return;
 
-    const isSame = currentActiveSet === setName;
+    const isSame = currentActiveSkin === setName;
+    const nextSkin = isSame ? "none" : setName;
     const nextSet = isSame ? "none" : setName;
 
-    const storageUpdate = { activeSet: nextSet };
-    if (setType === "skin") {
-      storageUpdate.activeSkin = isSame ? "none" : setName;
-    }
-    if (setType === "effect") {
-      storageUpdate.activeEffect = isSame ? "none" : setName;
-    }
-
-    chrome.storage.sync.set(storageUpdate, () => {
-      currentActiveSet = isSame ? null : setName;
-      setActiveUI(currentActiveSet);
-      if (setType === "skin") {
-        updateEffectPreviews(isSame ? "set2" : setName);
-      }
+    chrome.storage.sync.set({ activeSet: nextSet, activeSkin: nextSkin }, () => {
+      currentActiveSkin = isSame ? null : setName;
+      setActiveSkinUI(currentActiveSkin);
+      updateEffectPreviews(currentActiveSkin || "set2");
     });
   });
 });
 
-function updateUI(enabled) {
-  sets.forEach(set => {
-    set.classList.toggle("disabled", !enabled);
+effectKings.forEach((king) => {
+  const effectName = king.dataset.effect;
+  if (!effectName) return;
+
+  king.addEventListener("click", () => {
+    if (!toggle.checked) return;
+
+    const isSame = currentActiveEffect === effectName;
+    const nextEffect = isSame ? "none" : effectName;
+
+    chrome.storage.sync.set({ activeSet: nextEffect, activeEffect: nextEffect }, () => {
+      currentActiveEffect = isSame ? null : effectName;
+      setActiveEffectUI(currentActiveEffect);
+    });
+  });
+});
+
+targetButtons.forEach((button) => {
+  const target = button.dataset.target;
+  if (!target) return;
+
+  button.addEventListener("click", () => {
+    if (!toggle.checked) return;
+    currentTarget = target;
+    chrome.storage.sync.set({ activeTarget: target }, () => {
+      setActiveTargetUI(currentTarget);
+    });
+  });
+});
+
+if (cracksButton) {
+  cracksButton.addEventListener("click", () => {
+    if (!toggle.checked) return;
+    cracksEnabled = !cracksEnabled;
+    chrome.storage.sync.set({ cracksEnabled }, () => {
+      setCracksUI(cracksEnabled);
+    });
   });
 }
 
-function setActiveUI(activeID) {
-  sets.forEach(set => {
+function updateUI(enabled) {
+  skinSets.forEach(set => {
+    set.classList.toggle("disabled", !enabled);
+  });
+  const effectContainer = document.querySelector('.set[data-type="effect"]');
+  if (effectContainer) {
+    effectContainer.classList.toggle("disabled", !enabled);
+  }
+  const targetToggle = document.querySelector(".target-toggle");
+  if (targetToggle) {
+    targetToggle.classList.toggle("disabled", !enabled);
+  }
+  if (cracksButton) {
+    const cracksContainer = cracksButton.closest(".cracks-toggle");
+    if (cracksContainer) {
+      cracksContainer.classList.toggle("disabled", !enabled);
+    }
+  }
+}
+
+function setActiveSkinUI(activeID) {
+  skinSets.forEach(set => {
     set.classList.toggle("active", activeID && set.dataset.set === activeID);
   });
+}
+
+function setActiveEffectUI(activeID) {
+  effectKings.forEach((king) => {
+    king.classList.toggle("active", activeID && king.dataset.effect === activeID);
+  });
+}
+
+function setActiveTargetUI(activeID) {
+  targetButtons.forEach((button) => {
+    button.classList.toggle("active", activeID && button.dataset.target === activeID);
+  });
+}
+
+function setCracksUI(enabled) {
+  if (!cracksButton) return;
+  cracksButton.classList.toggle("active", enabled);
+  cracksButton.textContent = enabled ? "Disable cracks" : "Enable cracks";
 }
