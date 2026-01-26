@@ -9,7 +9,8 @@
   "content_scripts": [
     {
       "matches": ["*://*.chess.com/*"],
-      "js": ["content.js"]
+      "js": ["content-script.js"],
+      "css": ["styles.css"]
     }
   ],
   "web_accessible_resources": [

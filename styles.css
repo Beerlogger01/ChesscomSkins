@@ -1,0 +1,89 @@
+.chesscom-skins-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.chesscom-crack {
+  position: absolute;
+  width: 40%;
+  height: 40%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M12 40 L35 32 L48 46 L62 38 L76 52 L95 44' stroke='rgba(40,25,15,0.75)' stroke-width='2.4' fill='none'/%3E%3Cpath d='M20 78 L38 70 L52 82 L70 74 L88 90' stroke='rgba(50,30,18,0.7)' stroke-width='2.2' fill='none'/%3E%3Cpath d='M58 18 L62 34 L54 46 L64 64 L58 82' stroke='rgba(35,20,12,0.6)' stroke-width='2' fill='none'/%3E%3Cpath d='M90 18 L76 32 L80 46 L70 58 L78 76' stroke='rgba(35,20,12,0.55)' stroke-width='1.8' fill='none'/%3E%3C/svg%3E"),
+    radial-gradient(circle at 30% 35%, rgba(70,45,25,0.35) 0%, transparent 55%),
+    radial-gradient(circle at 70% 70%, rgba(60,35,20,0.3) 0%, transparent 55%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  mix-blend-mode: multiply;
+  animation: crackPulse 3s ease-out forwards;
+}
+
+.chesscom-crack.capture {
+  width: 52%;
+  height: 52%;
+  filter: drop-shadow(0 0 12px rgba(255,90,60,0.6));
+  animation: crackCapture 3.4s ease-out forwards;
+}
+
+.chesscom-crack.generic {
+  width: 60%;
+  height: 60%;
+  animation: crackPulse 3s ease-out forwards;
+}
+
+@keyframes crackPulse {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 0.75; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+@keyframes crackCapture {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  60% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+.chesscom-end-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Inter", sans-serif;
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(0,0,0,0.6);
+  background: radial-gradient(circle, rgba(20,10,0,0.5) 0%, rgba(0,0,0,0.85) 70%);
+  animation: endScreen 4s ease-out forwards;
+}
+
+.chesscom-end-screen.win {
+  color: #f8f1c8;
+  text-shadow: 0 0 24px rgba(255,200,80,0.8);
+}
+
+.chesscom-end-screen.lose {
+  color: #ffd7d7;
+  text-shadow: 0 0 24px rgba(255,90,90,0.8);
+}
+
+.chesscom-end-screen.draw {
+  color: #e5e5e5;
+  text-shadow: 0 0 24px rgba(200,200,200,0.8);
+}
+
+@keyframes endScreen {
+  0% { opacity: 0; transform: scale(0.96); }
+  15% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.05); }
+}
