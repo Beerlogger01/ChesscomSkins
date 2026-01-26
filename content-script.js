@@ -13,6 +13,8 @@ let endScreenActive = false;
 let lastEndMessage = "";
 let lastTriggerKey = "";
 let resizeBound = false;
+const activeCracks = [];
+const MAX_ACTIVE_CRACKS = 4;
 let moveListObserver = null;
 let boardObserver = null;
 let statusObserver = null;
@@ -245,7 +247,7 @@ function squareToPosition(square, board, orientation) {
   const rect = board.getBoundingClientRect();
   const file = square.charCodeAt(0) - 97;
   const rank = parseInt(square[1], 10) - 1;
-  const size = rect.width / 8;
+  const size = Math.min(rect.width, rect.height) / 8;
   if (!size) return null;
 
   let fileIndex = file;
@@ -287,9 +289,18 @@ function spawnCrackEffect(square, isCapture, fallbackCenter = false) {
   crack.style.borderRadius = `${Math.max(position.size * 0.08, 4)}px`;
   crack.style.overflow = "hidden";
   overlayRoot.appendChild(crack);
+  activeCracks.push(crack);
+  if (activeCracks.length > MAX_ACTIVE_CRACKS) {
+    const oldest = activeCracks.shift();
+    if (oldest) oldest.remove();
+  }
 
   crack.addEventListener("animationend", () => {
     crack.remove();
+    const index = activeCracks.indexOf(crack);
+    if (index !== -1) {
+      activeCracks.splice(index, 1);
+    }
   });
 }
 

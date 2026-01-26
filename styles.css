@@ -19,7 +19,6 @@
     radial-gradient(circle at 70% 70%, rgba(60,35,20,0.3) 0%, transparent 55%);
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  mix-blend-mode: multiply;
   overflow: hidden;
   pointer-events: none;
   animation: crackPulse 3s ease-out forwards;
