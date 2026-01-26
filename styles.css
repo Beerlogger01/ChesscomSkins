@@ -7,11 +7,11 @@
 
 .chesscom-crack {
   position: absolute;
-  width: 40%;
-  height: 40%;
+  width: 100%;
+  height: 100%;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) scale(0.8);
+  transform: translate(-50%, -50%) scale(0.96);
   opacity: 0;
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cpath d='M12 40 L35 32 L48 46 L62 38 L76 52 L95 44' stroke='rgba(40,25,15,0.75)' stroke-width='2.4' fill='none'/%3E%3Cpath d='M20 78 L38 70 L52 82 L70 74 L88 90' stroke='rgba(50,30,18,0.7)' stroke-width='2.2' fill='none'/%3E%3Cpath d='M58 18 L62 34 L54 46 L64 64 L58 82' stroke='rgba(35,20,12,0.6)' stroke-width='2' fill='none'/%3E%3Cpath d='M90 18 L76 32 L80 46 L70 58 L78 76' stroke='rgba(35,20,12,0.55)' stroke-width='1.8' fill='none'/%3E%3C/svg%3E"),
@@ -20,34 +20,32 @@
   background-size: 100% 100%;
   background-repeat: no-repeat;
   mix-blend-mode: multiply;
+  overflow: hidden;
+  pointer-events: none;
   animation: crackPulse 3s ease-out forwards;
 }
 
 .chesscom-crack.capture {
-  width: 52%;
-  height: 52%;
   filter: drop-shadow(0 0 12px rgba(255,90,60,0.6));
   animation: crackCapture 3.4s ease-out forwards;
 }
 
 .chesscom-crack.generic {
-  width: 60%;
-  height: 60%;
   animation: crackPulse 3s ease-out forwards;
 }
 
 @keyframes crackPulse {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
   20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   70% { opacity: 0.75; }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.03); }
 }
 
 @keyframes crackCapture {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
   60% { opacity: 0.9; }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05); }
 }
 
 .chesscom-end-screen {

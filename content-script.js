@@ -282,6 +282,10 @@ function spawnCrackEffect(square, isCapture, fallbackCenter = false) {
   if (fallbackCenter) crack.classList.add("generic");
   crack.style.left = `${position.x}px`;
   crack.style.top = `${position.y}px`;
+  crack.style.width = `${position.size}px`;
+  crack.style.height = `${position.size}px`;
+  crack.style.borderRadius = `${Math.max(position.size * 0.08, 4)}px`;
+  crack.style.overflow = "hidden";
   overlayRoot.appendChild(crack);
 
   crack.addEventListener("animationend", () => {
