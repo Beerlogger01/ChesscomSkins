@@ -11,6 +11,8 @@ let overlayBoard = null;
 let overlayOrientation = "white";
 let endScreenActive = false;
 let lastEndMessage = "";
+let lastTriggerKey = "";
+let resizeBound = false;
 let moveListObserver = null;
 let boardObserver = null;
 let statusObserver = null;
@@ -318,6 +320,9 @@ function handleMoveEvent(reason) {
     destination = lastKnownDestination;
   }
 
+  const triggerKey = `${destination || "center"}-${capture}-${san || ""}-${lastMoveSquares.join(",")}`;
+  if (triggerKey === lastTriggerKey) return;
+  lastTriggerKey = triggerKey;
   log("Move event", reason, { destination, capture, san, lastMoveSquares });
   spawnCrackEffect(destination, capture, !destination);
 }
@@ -403,7 +408,10 @@ function initObservers() {
   observeBoard();
   observeMoveList();
   observeStatus();
-  window.addEventListener("resize", resizeOverlay);
+  if (!resizeBound) {
+    window.addEventListener("resize", resizeOverlay);
+    resizeBound = true;
+  }
 }
 
 function bootstrap() {
@@ -414,6 +422,26 @@ function bootstrap() {
     lastBoardSnapshot = parseBoardState();
   }
   initObservers();
+}
+
+function stopObservers() {
+  if (boardObserver) {
+    boardObserver.disconnect();
+    boardObserver = null;
+  }
+  if (moveListObserver) {
+    moveListObserver.disconnect();
+    moveListObserver = null;
+  }
+  if (statusObserver) {
+    statusObserver.disconnect();
+    statusObserver = null;
+  }
+  if (overlayRoot) {
+    overlayRoot.remove();
+    overlayRoot = null;
+    overlayBoard = null;
+  }
 }
 
 chrome.storage.sync.get(["enabled", "cracksEnabled"], (data) => {
@@ -429,6 +457,8 @@ chrome.storage.onChanged.addListener((changes) => {
     overlaysEnabled = !!changes.enabled.newValue;
     if (overlaysEnabled) {
       bootstrap();
+    } else {
+      stopObservers();
     }
   }
   if (changes.cracksEnabled) {
