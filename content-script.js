@@ -1,32 +1,29 @@
 const DEBUG = true;
 const LOG_PREFIX = "[ChesscomSkins]";
 
-let cracksEnabled = false;
+const MAX_ACTIVE_CRACKS = 4;
+const activeCracks = [];
+
 let overlaysEnabled = false;
-let lastBoardSnapshot = new Map();
-let lastMoveSignature = "";
-let lastKnownDestination = null;
+let cracksEnabled = false;
 let overlayRoot = null;
 let overlayBoard = null;
 let overlayOrientation = "white";
-let endScreenActive = false;
-let lastEndMessage = "";
+let lastBoardSnapshot = new Map();
+let lastMoveSignature = "";
+let lastKnownDestination = null;
 let lastTriggerKey = "";
-let resizeBound = false;
-const activeCracks = [];
-const MAX_ACTIVE_CRACKS = 4;
-let moveListObserver = null;
 let boardObserver = null;
+let moveListObserver = null;
 let statusObserver = null;
+let resizeBound = false;
 
 function log(...args) {
-  if (!DEBUG) return;
-  console.log(LOG_PREFIX, ...args);
+  if (DEBUG) console.log(LOG_PREFIX, ...args);
 }
 
 function warn(...args) {
-  if (!DEBUG) return;
-  console.warn(LOG_PREFIX, ...args);
+  if (DEBUG) console.warn(LOG_PREFIX, ...args);
 }
 
 function getBoardElement() {
@@ -42,9 +39,7 @@ function getBoardOrientation(board) {
     return "black";
   }
   const orientationAttr = board.getAttribute("data-orientation");
-  if (orientationAttr === "black") {
-    return "black";
-  }
+  if (orientationAttr === "black") return "black";
   return "white";
 }
 
@@ -55,15 +50,12 @@ function ensureOverlay(board) {
   overlayBoard = board;
   overlayOrientation = getBoardOrientation(board);
 
-  if (overlayRoot) {
-    overlayRoot.remove();
-  }
+  if (overlayRoot) overlayRoot.remove();
 
   const overlay = document.createElement("div");
   overlay.className = "chesscom-skins-overlay";
   const parent = board.parentElement || board;
-  const style = window.getComputedStyle(parent);
-  if (style.position === "static") {
+  if (getComputedStyle(parent).position === "static") {
     parent.style.position = "relative";
   }
   parent.appendChild(overlay);
@@ -84,17 +76,13 @@ function resizeOverlay() {
 
 function squareFromClass(classList) {
   if (!classList) return null;
-  const classes = Array.from(classList);
-  for (const cls of classes) {
+  for (const cls of Array.from(classList)) {
     const match = cls.match(/square-([a-h])([1-8])/i);
-    if (match) {
-      return `${match[1].toLowerCase()}${match[2]}`;
-    }
+    if (match) return `${match[1].toLowerCase()}${match[2]}`;
     const numeric = cls.match(/square-(\d)(\d)/);
     if (numeric) {
       const file = String.fromCharCode(96 + Number(numeric[1]));
-      const rank = numeric[2];
-      return `${file}${rank}`;
+      return `${file}${numeric[2]}`;
     }
   }
   return null;
@@ -106,10 +94,10 @@ function squareFromTransform(el, boardRect, orientation) {
   if (!match) return null;
   const x = parseFloat(match[1]);
   const y = parseFloat(match[2]);
-  const squareSize = boardRect.width / 8;
-  if (!squareSize) return null;
-  const fileIndex = Math.floor(x / squareSize);
-  const rankIndex = Math.floor(y / squareSize);
+  const size = Math.min(boardRect.width, boardRect.height) / 8;
+  if (!size) return null;
+  const fileIndex = Math.floor(x / size);
+  const rankIndex = Math.floor(y / size);
   if (fileIndex < 0 || fileIndex > 7 || rankIndex < 0 || rankIndex > 7) return null;
   let file;
   let rank;
@@ -126,8 +114,8 @@ function squareFromTransform(el, boardRect, orientation) {
 function parseBoardState() {
   const board = getBoardElement();
   if (!board) return new Map();
-  const orientation = getBoardOrientation(board);
   const rect = board.getBoundingClientRect();
+  const orientation = getBoardOrientation(board);
   const pieces = new Map();
   const pieceNodes = board.querySelectorAll(".piece, [data-piece]");
 
@@ -205,11 +193,10 @@ function detectMoveByDiff(prevMap, nextMap) {
   });
 
   if (fromSquares.length === 1 && toSquares.length === 1) {
-    const capture = captures.length > 0;
     return {
       from: fromSquares[0].square,
       to: toSquares[0].square,
-      capture
+      capture: captures.length > 0
     };
   }
 
@@ -226,15 +213,13 @@ function detectMoveByDiff(prevMap, nextMap) {
 
   if (fromSquares.length === 1 && toSquares.length === 1) {
     const movedPiece = toSquares[0].piece;
-    const isPawn = movedPiece.endsWith("p");
-    if (isPawn) {
+    if (movedPiece.endsWith("p")) {
       const fromFile = fromSquares[0].square[0];
       const toFile = toSquares[0].square[0];
-      const capture = fromFile !== toFile;
       return {
         from: fromSquares[0].square,
         to: toSquares[0].square,
-        capture
+        capture: fromFile !== toFile
       };
     }
   }
@@ -258,8 +243,8 @@ function squareToPosition(square, board, orientation) {
     fileIndex = 7 - file;
   }
 
-  const x = fileIndex * size + size / 2;
-  const y = rankIndex * size + size / 2;
+  const x = fileIndex * size;
+  const y = rankIndex * size;
   return { x, y, size };
 }
 
@@ -275,33 +260,37 @@ function spawnCrackEffect(square, isCapture, fallbackCenter = false) {
 
   if (!position) {
     const rect = overlayBoard.getBoundingClientRect();
-    position = { x: rect.width / 2, y: rect.height / 2, size: rect.width / 8 };
+    const size = Math.min(rect.width, rect.height) / 8;
+    position = { x: rect.width / 2 - size / 2, y: rect.height / 2 - size / 2, size };
   }
+
+  const slot = document.createElement("div");
+  slot.className = "chesscom-crack-slot";
+  slot.style.left = `${position.x}px`;
+  slot.style.top = `${position.y}px`;
+  slot.style.width = `${position.size}px`;
+  slot.style.height = `${position.size}px`;
+  slot.style.borderRadius = `${Math.max(position.size * 0.08, 4)}px`;
 
   const crack = document.createElement("div");
   crack.className = "chesscom-crack";
   if (isCapture) crack.classList.add("capture");
-  if (fallbackCenter) crack.classList.add("generic");
-  crack.style.left = `${position.x}px`;
-  crack.style.top = `${position.y}px`;
-  crack.style.width = `${position.size}px`;
-  crack.style.height = `${position.size}px`;
-  crack.style.borderRadius = `${Math.max(position.size * 0.08, 4)}px`;
-  crack.style.overflow = "hidden";
-  overlayRoot.appendChild(crack);
-  activeCracks.push(crack);
+  slot.appendChild(crack);
+  overlayRoot.appendChild(slot);
+
+  activeCracks.push(slot);
   if (activeCracks.length > MAX_ACTIVE_CRACKS) {
     const oldest = activeCracks.shift();
     if (oldest) oldest.remove();
   }
 
   crack.addEventListener("animationend", () => {
-    crack.remove();
-    const index = activeCracks.indexOf(crack);
-    if (index !== -1) {
-      activeCracks.splice(index, 1);
-    }
+    slot.remove();
+    const index = activeCracks.indexOf(slot);
+    if (index !== -1) activeCracks.splice(index, 1);
   });
+
+  log("Crack spawn", { square, capture: isCapture });
 }
 
 function handleMoveEvent(reason) {
@@ -342,6 +331,7 @@ function handleMoveEvent(reason) {
   const triggerKey = `${destination || "center"}-${capture}-${san || ""}-${lastMoveSquares.join(",")}`;
   if (triggerKey === lastTriggerKey) return;
   lastTriggerKey = triggerKey;
+
   log("Move event", reason, { destination, capture, san, lastMoveSquares });
   spawnCrackEffect(destination, capture, !destination);
 }
@@ -384,7 +374,6 @@ function detectEndState(text) {
     { key: "lose", regex: /(you lost|defeat|resigned|time|timeout)/ },
     { key: "draw", regex: /(draw|stalemate)/ }
   ];
-
   for (const pattern of patterns) {
     if (pattern.regex.test(lowered)) return pattern.key;
   }
@@ -393,10 +382,6 @@ function detectEndState(text) {
 
 function showEndScreen(type, message) {
   if (!overlayRoot || !overlayBoard) return;
-  if (endScreenActive && message === lastEndMessage) return;
-  endScreenActive = true;
-  lastEndMessage = message;
-
   const endScreen = document.createElement("div");
   endScreen.className = `chesscom-end-screen ${type}`;
   endScreen.textContent = message;
@@ -404,7 +389,6 @@ function showEndScreen(type, message) {
 
   endScreen.addEventListener("animationend", () => {
     endScreen.remove();
-    endScreenActive = false;
   });
 }
 
@@ -419,7 +403,6 @@ function observeStatus() {
     ensureOverlay(board);
     showEndScreen(type, text.trim());
   });
-
   statusObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
 
@@ -466,9 +449,7 @@ function stopObservers() {
 chrome.storage.sync.get(["enabled", "cracksEnabled"], (data) => {
   overlaysEnabled = !!data.enabled;
   cracksEnabled = !!data.cracksEnabled;
-  if (overlaysEnabled) {
-    bootstrap();
-  }
+  if (overlaysEnabled) bootstrap();
 });
 
 chrome.storage.onChanged.addListener((changes) => {

@@ -1,0 +1,8 @@
+<!--
+  Source: https://github.com/feathericons/feather/blob/master/icons/zap.svg
+  License: MIT (Feather Icons)
+  Adapted for crack effect styling.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none" stroke="#5b3a24" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="70 10 24 68 58 68 46 110 96 50 62 50 70 10" />
+</svg>

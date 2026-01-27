@@ -65,11 +65,6 @@ let overlayStyleTag = null;
 let skinsEnabled = false;
 let activeSkinPath = null;
 let capturedObserver = null;
-let crackStyleTag = null;
-let cracksEnabled = false;
-let crackObserver = null;
-const crackTimers = new Map();
-const CRACK_DURATION_MS = 3200;
 
 function applySkin(skinName, skinPath) {
   if (lastAppliedSkin === skinName && activeSkinPath === skinPath) return;
@@ -389,109 +384,8 @@ function disableSkins() {
   lastAppliedTarget = null;
 }
 
-function applyCracks(enabled) {
-  cracksEnabled = enabled;
-  if (!enabled) {
-    removeCrackStyles();
-    removeCrackObservers();
-    clearCrackTimers();
-    return;
-  }
-  ensureCrackStyles();
-  ensureCrackObserver();
-  applyCracksToLastMove();
-}
-
-function ensureCrackStyles() {
-  if (crackStyleTag) return;
-  const crackSvg = encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-      <path d="M12 40 L35 32 L48 46 L62 38 L76 52 L95 44" stroke="rgba(40,25,15,0.75)" stroke-width="2.4" fill="none"/>
-      <path d="M20 78 L38 70 L52 82 L70 74 L88 90" stroke="rgba(50,30,18,0.7)" stroke-width="2.2" fill="none"/>
-      <path d="M58 18 L62 34 L54 46 L64 64 L58 82" stroke="rgba(35,20,12,0.6)" stroke-width="2" fill="none"/>
-      <path d="M90 18 L76 32 L80 46 L70 58 L78 76" stroke="rgba(35,20,12,0.55)" stroke-width="1.8" fill="none"/>
-    </svg>`
-  );
-  crackStyleTag = document.createElement("style");
-  crackStyleTag.textContent = `
-    .cracked-square {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cracked-square::after {
-      content: "";
-      position: absolute;
-      inset: 4%;
-      pointer-events: none;
-      background-image:
-        url("data:image/svg+xml,${crackSvg}"),
-        radial-gradient(circle at 30% 35%, rgba(70,45,25,0.35) 0%, transparent 55%),
-        radial-gradient(circle at 70% 70%, rgba(60,35,20,0.3) 0%, transparent 55%);
-      background-size: 100% 100%;
-      background-repeat: no-repeat;
-      mix-blend-mode: multiply;
-      opacity: 0;
-      transform: scale(0.9);
-      animation: crackFade 3.2s ease-out forwards;
-    }
-
-    @keyframes crackFade {
-      0% { opacity: 0; transform: scale(0.9); }
-      15% { opacity: 1; transform: scale(1); }
-      65% { opacity: 0.75; }
-      100% { opacity: 0; transform: scale(1.04); }
-    }
-  `;
-  document.head.appendChild(crackStyleTag);
-}
-
-function removeCrackStyles() {
-  if (crackStyleTag) crackStyleTag.remove();
-  crackStyleTag = null;
-}
-
-function ensureCrackObserver() {
-  if (crackObserver) return;
-  crackObserver = new MutationObserver(() => applyCracksToLastMove());
-  crackObserver.observe(document.body, {
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["class"]
-  });
-}
-
-function removeCrackObservers() {
-  if (crackObserver) {
-    crackObserver.disconnect();
-    crackObserver = null;
-  }
-}
-
-function applyCracksToLastMove() {
-  if (!cracksEnabled) return;
-  const squares = document.querySelectorAll(".last-move");
-  squares.forEach((square) => {
-    if (square.classList.contains("cracked-square")) return;
-    square.classList.add("cracked-square");
-    const timer = setTimeout(() => {
-      square.classList.remove("cracked-square");
-      crackTimers.delete(square);
-    }, CRACK_DURATION_MS);
-    crackTimers.set(square, timer);
-  });
-}
-
-function clearCrackTimers() {
-  crackTimers.forEach((timerId) => clearTimeout(timerId));
-  crackTimers.clear();
-  document.querySelectorAll(".cracked-square").forEach((square) => {
-    square.classList.remove("cracked-square");
-  });
-}
-
 chrome.storage.sync.get(
-  ["enabled", "activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "activeSet", "cracksEnabled"],
+  ["enabled", "activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "activeSet"],
   (data) => {
   skinsEnabled = !!data.enabled;
   if (!skinsEnabled) return;
@@ -511,24 +405,21 @@ chrome.storage.sync.get(
 
   applySkin(activeSkin || "set2", skinPath || null);
   applyEffect(activeEffect || "native-ember", activeTarget);
-  applyCracks(!!data.cracksEnabled);
 });
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled && changes.enabled.newValue === false) {
     skinsEnabled = false;
     disableSkins();
-    applyCracks(false);
   }
 
   if (changes.enabled && changes.enabled.newValue === true) {
     skinsEnabled = true;
     chrome.storage.sync.get(
-      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "cracksEnabled"],
+      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath"],
       (data) => {
       applySkin(data.activeSkin || "set2", data.activeSkinPath || null);
       applyEffect(data.activeEffect || "native-ember", data.activeTarget || "all");
-      applyCracks(!!data.cracksEnabled);
     });
   }
 
@@ -570,15 +461,6 @@ chrome.storage.onChanged.addListener((changes) => {
     });
   }
 
-  if (changes.cracksEnabled) {
-    chrome.storage.sync.get("enabled", (data) => {
-      if (data.enabled) {
-        applyCracks(!!changes.cracksEnabled.newValue);
-      } else {
-        applyCracks(false);
-      }
-    });
-  }
 });
 
 let lastOverlayAt = 0;
