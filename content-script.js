@@ -395,6 +395,7 @@ function showEndScreen(type, message) {
 }
 
 function observeStatus() {
+  if (!document.body) return;
   if (statusObserver) statusObserver.disconnect();
   statusObserver = new MutationObserver((mutations) => {
     const text = mutations.map((m) => m.target.textContent || "").join(" ");
@@ -441,6 +442,10 @@ function stopObservers() {
     statusObserver.disconnect();
     statusObserver = null;
   }
+  if (readyObserver) {
+    readyObserver.disconnect();
+    readyObserver = null;
+  }
   if (overlayRoot) {
     overlayRoot.remove();
     overlayRoot = null;
@@ -471,10 +476,25 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-const readyObserver = new MutationObserver(() => {
-  const board = getBoardElement();
-  if (board && overlaysEnabled && overlayBoard !== board) {
-    bootstrap();
-  }
-});
-readyObserver.observe(document.body, { childList: true, subtree: true });
+let readyObserver = null;
+
+// Инициализируем наблюдатель только когда document.body готов
+function initReadyObserver() {
+  if (readyObserver || !document.body) return;
+  
+  readyObserver = new MutationObserver(() => {
+    const board = getBoardElement();
+    if (board && overlaysEnabled && overlayBoard !== board) {
+      bootstrap();
+    }
+  });
+  
+  readyObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+// Запуск инициализации
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initReadyObserver);
+} else {
+  initReadyObserver();
+}
