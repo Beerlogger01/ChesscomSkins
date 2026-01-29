@@ -111,13 +111,21 @@ function squareFromTransform(el, boardRect, orientation) {
   return `${file}${rank}`;
 }
 
+let lastBoardRect = null;
+let lastBoardOrientation = null;
+
 function parseBoardState() {
   const board = getBoardElement();
   if (!board) return new Map();
-  const rect = board.getBoundingClientRect();
-  const orientation = getBoardOrientation(board);
+  
+  // Кэшируем дорогостоящие вычисления - их не нужно вычислять каждый раз
+  if (!lastBoardRect) lastBoardRect = board.getBoundingClientRect();
+  if (!lastBoardOrientation) lastBoardOrientation = getBoardOrientation(board);
+  
+  const rect = lastBoardRect;
+  const orientation = lastBoardOrientation;
   const pieces = new Map();
-  const pieceNodes = board.querySelectorAll(".piece, [data-piece]");
+  const pieceNodes = board.querySelectorAll(".piece"); // Убираем [data-piece] - редко используется
 
   pieceNodes.forEach((piece) => {
     const dataPiece = piece.dataset?.piece;
@@ -336,11 +344,22 @@ function handleMoveEvent(reason) {
   spawnCrackEffect(destination, capture, !destination);
 }
 
+let lastBoardUpdateTime = 0;
+const BOARD_UPDATE_THROTTLE = 300; // ms - избегаем спама
+let lastBoardRect = null;
+let lastBoardOrientation = null;
+
+function invalidateBoardCache() {
+  lastBoardRect = null;
+  lastBoardOrientation = null;
+}
+
 function updateMoveSignature() {
   const moveList = findMoveList();
   const signature = moveList ? moveList.textContent?.trim() : "";
   if (signature && signature !== lastMoveSignature) {
     lastMoveSignature = signature;
+    invalidateBoardCache(); // Сбрасываем кэш при изменении доски
     handleMoveEvent("move-list");
   }
 }
@@ -352,6 +371,12 @@ function observeBoard() {
   if (boardObserver) boardObserver.disconnect();
 
   boardObserver = new MutationObserver(() => {
+    // Дебаунс: не вызываем handleMoveEvent чаще чем раз в 300ms
+    const now = Date.now();
+    if (now - lastBoardUpdateTime < BOARD_UPDATE_THROTTLE) return;
+    lastBoardUpdateTime = now;
+    
+    invalidateBoardCache(); // Сбрасываем кэш
     handleMoveEvent("board-highlight");
   });
   boardObserver.observe(board, { subtree: true, attributes: true, childList: true });
