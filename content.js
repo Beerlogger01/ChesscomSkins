@@ -199,9 +199,7 @@ function applyEffect(effectName, targetName) {
         filter: var(--piece-filter, none) drop-shadow(0 0 4px var(--ring-color, rgba(255,120,60,0.85)));
       }
       70% {
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 10px var(--ring-color, rgba(255,120,60,0.85)))
-          drop-shadow(0 0 18px var(--ring-color, rgba(255,120,60,0.6)));
+        filter: var(--piece-filter, none) drop-shadow(0 0 10px var(--ring-color, rgba(255,120,60,0.85)));
       }
       100% {
         filter: var(--piece-filter, none) drop-shadow(0 0 6px var(--ring-color, rgba(255,120,60,0.85)));
@@ -213,9 +211,7 @@ function applyEffect(effectName, targetName) {
         filter: var(--piece-filter, none) drop-shadow(0 0 5px var(--ring-color, rgba(255,120,60,0.75)));
       }
       50% {
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 12px var(--ring-color, rgba(255,120,60,0.95)))
-          drop-shadow(0 0 22px var(--ring-color, rgba(255,120,60,0.7)));
+        filter: var(--piece-filter, none) drop-shadow(0 0 12px var(--ring-color, rgba(255,120,60,0.95)));
       }
       100% {
         filter: var(--piece-filter, none) drop-shadow(0 0 6px var(--ring-color, rgba(255,120,60,0.8)));
@@ -227,9 +223,7 @@ function applyEffect(effectName, targetName) {
         filter: var(--piece-filter, none) drop-shadow(0 0 4px var(--ring-color, rgba(255,120,60,0.8)));
       }
       70% {
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 10px var(--ring-color, rgba(255,120,60,0.9)))
-          drop-shadow(0 0 16px var(--ring-color, rgba(255,120,60,0.6)));
+        filter: var(--piece-filter, none) drop-shadow(0 0 10px var(--ring-color, rgba(255,120,60,0.9)));
       }
       100% {
         filter: var(--piece-filter, none) drop-shadow(0 0 6px var(--ring-color, rgba(255,120,60,0.8)));
@@ -252,9 +246,7 @@ function applyEffect(effectName, targetName) {
       }
       40% {
         transform: scale(1.08);
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 14px rgba(255,210,80,0.95))
-          drop-shadow(0 0 24px rgba(255,120,80,0.8));
+        filter: var(--piece-filter, none) drop-shadow(0 0 14px rgba(255,210,80,0.95));
       }
       100% {
         transform: scale(1.02);
@@ -269,9 +261,7 @@ function applyEffect(effectName, targetName) {
       }
       50% {
         transform: scale(1.08);
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 14px rgba(255,70,70,0.95))
-          drop-shadow(0 0 22px rgba(255,70,70,0.7));
+        filter: var(--piece-filter, none) drop-shadow(0 0 14px rgba(255,70,70,0.95));
       }
       100% {
         transform: scale(1);
@@ -286,9 +276,7 @@ function applyEffect(effectName, targetName) {
       }
       50% {
         transform: scale(1.15) rotate(6deg);
-        filter: var(--piece-filter, none)
-          drop-shadow(0 0 20px rgba(255,200,60,1))
-          drop-shadow(0 0 28px rgba(255,140,80,0.85));
+        filter: var(--piece-filter, none) drop-shadow(0 0 20px rgba(255,200,60,1));
       }
       100% {
         transform: scale(1) rotate(0deg);
@@ -427,7 +415,9 @@ chrome.storage.onChanged.addListener((changes) => {
 
   if (changes.enabled && changes.enabled.newValue === true) {
     skinsEnabled = true;
-    chrome.storage.sync.get(["activeSkin", "activeEffect", "activeTarget", "activeSkinPath"], (data) => {
+    chrome.storage.sync.get(
+      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath"],
+      (data) => {
       applySkin(data.activeSkin || "set2", data.activeSkinPath || null);
       applyEffect(data.activeEffect || "native-ember", data.activeTarget || "all");
     });
@@ -470,6 +460,7 @@ chrome.storage.onChanged.addListener((changes) => {
       }
     });
   }
+
 });
 
 let lastOverlayAt = 0;
