@@ -10,7 +10,8 @@
     {
       "matches": ["*://*.chess.com/*"],
       "js": ["content.js", "content-script.js"],
-      "css": ["styles.css"]
+      "css": ["styles.css"],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [

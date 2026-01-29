@@ -348,12 +348,14 @@ function updateMoveSignature() {
 function observeBoard() {
   const board = getBoardElement();
   if (!board) return;
+  if (boardObserver && overlayBoard === board) return;
   if (boardObserver) boardObserver.disconnect();
 
   boardObserver = new MutationObserver(() => {
     handleMoveEvent("board-highlight");
   });
   boardObserver.observe(board, { subtree: true, attributes: true, childList: true });
+  overlayBoard = board;
 }
 
 function observeMoveList() {
