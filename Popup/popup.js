@@ -311,7 +311,7 @@ if (glowIntensitySlider) {
         chrome.tabs.sendMessage(tab.id, {
           action: "setGlowIntensity",
           intensity: intensity
-        }).catch(() => {});
+        }, () => {});
       });
     });
   });
@@ -338,7 +338,7 @@ boardButtons.forEach(button => {
         chrome.tabs.sendMessage(tab.id, {
           action: "setBoardStyle",
           style: boardStyle
-        }).catch(() => {});
+        }, () => {});
       });
     });
   });
@@ -365,7 +365,7 @@ featureButtons.forEach(button => {
           action: "setFeature",
           feature,
           enabled: enabledFeatures[feature]
-        }).catch(() => {});
+        }, () => {});
       });
     });
   });
