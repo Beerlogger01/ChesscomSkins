@@ -481,7 +481,10 @@ function stopObservers() {
 chrome.storage.sync.get(["enabled", "cracksEnabled"], (data) => {
   overlaysEnabled = !!data.enabled;
   cracksEnabled = !!data.cracksEnabled;
-  if (overlaysEnabled) bootstrap();
+  // Не запускаем bootstrap при document_start - ждём полной загрузки
+  if (document.readyState === "complete") {
+    if (overlaysEnabled) bootstrap();
+  }
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -518,8 +521,11 @@ function initReadyObserver() {
 }
 
 // Запуск инициализации
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReadyObserver);
-} else {
+// Дождёмся ПОЛНОЙ загрузки страницы перед запуском наблюдателей
+window.addEventListener("load", () => {
+  // Всё инициализируем только ПОСЛЕ полной загрузки
+  if (overlaysEnabled) {
+    bootstrap();
+  }
   initReadyObserver();
-}
+});
