@@ -111,13 +111,21 @@ function squareFromTransform(el, boardRect, orientation) {
   return `${file}${rank}`;
 }
 
+let lastBoardRect = null;
+let lastBoardOrientation = null;
+
 function parseBoardState() {
   const board = getBoardElement();
   if (!board) return new Map();
-  const rect = board.getBoundingClientRect();
-  const orientation = getBoardOrientation(board);
+  
+  // Кэшируем дорогостоящие вычисления - их не нужно вычислять каждый раз
+  if (!lastBoardRect) lastBoardRect = board.getBoundingClientRect();
+  if (!lastBoardOrientation) lastBoardOrientation = getBoardOrientation(board);
+  
+  const rect = lastBoardRect;
+  const orientation = lastBoardOrientation;
   const pieces = new Map();
-  const pieceNodes = board.querySelectorAll(".piece, [data-piece]");
+  const pieceNodes = board.querySelectorAll(".piece"); // Убираем [data-piece] - редко используется
 
   pieceNodes.forEach((piece) => {
     const dataPiece = piece.dataset?.piece;
@@ -336,11 +344,22 @@ function handleMoveEvent(reason) {
   spawnCrackEffect(destination, capture, !destination);
 }
 
+let lastBoardUpdateTime = 0;
+const BOARD_UPDATE_THROTTLE = 300; // ms - избегаем спама
+let lastBoardRect = null;
+let lastBoardOrientation = null;
+
+function invalidateBoardCache() {
+  lastBoardRect = null;
+  lastBoardOrientation = null;
+}
+
 function updateMoveSignature() {
   const moveList = findMoveList();
   const signature = moveList ? moveList.textContent?.trim() : "";
   if (signature && signature !== lastMoveSignature) {
     lastMoveSignature = signature;
+    invalidateBoardCache(); // Сбрасываем кэш при изменении доски
     handleMoveEvent("move-list");
   }
 }
@@ -348,12 +367,20 @@ function updateMoveSignature() {
 function observeBoard() {
   const board = getBoardElement();
   if (!board) return;
+  if (boardObserver && overlayBoard === board) return;
   if (boardObserver) boardObserver.disconnect();
 
   boardObserver = new MutationObserver(() => {
+    // Дебаунс: не вызываем handleMoveEvent чаще чем раз в 300ms
+    const now = Date.now();
+    if (now - lastBoardUpdateTime < BOARD_UPDATE_THROTTLE) return;
+    lastBoardUpdateTime = now;
+    
+    invalidateBoardCache(); // Сбрасываем кэш
     handleMoveEvent("board-highlight");
   });
   boardObserver.observe(board, { subtree: true, attributes: true, childList: true });
+  overlayBoard = board;
 }
 
 function observeMoveList() {
@@ -393,6 +420,7 @@ function showEndScreen(type, message) {
 }
 
 function observeStatus() {
+  if (!document.body) return;
   if (statusObserver) statusObserver.disconnect();
   statusObserver = new MutationObserver((mutations) => {
     const text = mutations.map((m) => m.target.textContent || "").join(" ");
@@ -439,6 +467,10 @@ function stopObservers() {
     statusObserver.disconnect();
     statusObserver = null;
   }
+  if (readyObserver) {
+    readyObserver.disconnect();
+    readyObserver = null;
+  }
   if (overlayRoot) {
     overlayRoot.remove();
     overlayRoot = null;
@@ -449,7 +481,10 @@ function stopObservers() {
 chrome.storage.sync.get(["enabled", "cracksEnabled"], (data) => {
   overlaysEnabled = !!data.enabled;
   cracksEnabled = !!data.cracksEnabled;
-  if (overlaysEnabled) bootstrap();
+  // Не запускаем bootstrap при document_start - ждём полной загрузки
+  if (document.readyState === "complete") {
+    if (overlaysEnabled) bootstrap();
+  }
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -469,10 +504,28 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-const readyObserver = new MutationObserver(() => {
-  const board = getBoardElement();
-  if (board && overlaysEnabled && overlayBoard !== board) {
+let readyObserver = null;
+
+// Инициализируем наблюдатель только когда document.body готов
+function initReadyObserver() {
+  if (readyObserver || !document.body) return;
+  
+  readyObserver = new MutationObserver(() => {
+    const board = getBoardElement();
+    if (board && overlaysEnabled && overlayBoard !== board) {
+      bootstrap();
+    }
+  });
+  
+  readyObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+// Запуск инициализации
+// Дождёмся ПОЛНОЙ загрузки страницы перед запуском наблюдателей
+window.addEventListener("load", () => {
+  // Всё инициализируем только ПОСЛЕ полной загрузки
+  if (overlaysEnabled) {
     bootstrap();
   }
+  initReadyObserver();
 });
-readyObserver.observe(document.body, { childList: true, subtree: true });

@@ -17,26 +17,7 @@
   <h2>Choose custom skin</h2>
 
   <div class="preview-window">
-    <div class="set festive disabled" data-set="set2" data-type="skin">
-      <button class="set-toggle">Festive Classic</button>
-      <div class="preview dark" data-label="Festive Classic">
-      <img src="../assets/Set2/wk.png">
-      <img src="../assets/Set2/wq.png">
-      <img src="../assets/Set2/wr.png">
-      <img src="../assets/Set2/wb.png">
-      <img src="../assets/Set2/wn.png">
-      <img src="../assets/Set2/wp.png">
-
-      <img src="../assets/Set2/bk.png">
-      <img src="../assets/Set2/bq.png">
-      <img src="../assets/Set2/br.png">
-      <img src="../assets/Set2/bb.png">
-      <img src="../assets/Set2/bn.png">
-      <img src="../assets/Set2/bp.png">
-      </div>
-    </div>
-
-    <div class="set disabled" data-type="effect">
+    <div id="skins-container"></div>
       <div class="preview light effect-preview-tile" data-label="Glow Effects">
         <div class="effect-king preview-ember" data-effect="native-ember" data-label="Ember Glow">
           <img src="../assets/Set2/wk.png" class="effect-preview" />
@@ -65,9 +46,45 @@
     </div>
   </div>
 
-  <div class="cracks-toggle">
+  <div class="glow-intensity-control disabled">
+    <span>Glow Intensity</span>
+    <div class="slider-container">
+      <input type="range" id="glow-intensity" min="0.1" max="1" step="0.1" value="1" class="slider-input">
+      <span class="intensity-value">100%</span>
+    </div>
+  </div>
+
+  <div class="board-styles-control disabled">
+    <span>Board Style</span>
+    <div class="board-buttons">
+      <button type="button" class="board-button" data-board="default">Classic</button>
+      <button type="button" class="board-button" data-board="marble">Marble</button>
+      <button type="button" class="board-button" data-board="forest">Forest</button>
+      <button type="button" class="board-button" data-board="neon">Neon</button>
+      <button type="button" class="board-button" data-board="twilight">Twilight</button>
+    </div>
+  </div>
+
+  <div class="features-toggle disabled">
+    <span>Features</span>
+    <div class="feature-buttons">
+      <button type="button" class="feature-button" data-feature="animation" title="Piece breathing animation">Animation</button>
+      <button type="button" class="feature-button" data-feature="particles" title="Particles on moves">Particles</button>
+      <button type="button" class="feature-button" data-feature="tournament" title="Random skin each game">Tournament</button>
+    </div>
+  </div>
+
+  <div class="cracks-toggle disabled">
     <span>Crack effect</span>
     <button type="button" class="cracks-button">Enable cracks</button>
+  </div>
+
+  <div class="import-export-section disabled">
+    <span>Skin Import/Export</span>
+    <div class="import-export-buttons">
+      <button type="button" class="import-button">Import Skin (ZIP)</button>
+      <button type="button" class="export-button" disabled>Export Current</button>
+    </div>
   </div>
 
 <script src="popup.js"></script>

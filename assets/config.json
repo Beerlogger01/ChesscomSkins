@@ -1,0 +1,50 @@
+{
+  "skins": [
+    {
+      "id": "set2",
+      "name": "Festive Classic",
+      "folder": "Set2",
+      "description": "Beautiful festive-themed chess pieces",
+      "previewPiece": "wk"
+    }
+  ],
+  "boardStyles": [
+    {
+      "id": "default",
+      "name": "Classic",
+      "lightColor": "#f0d9b5",
+      "darkColor": "#b58863",
+      "description": "Standard chess board"
+    },
+    {
+      "id": "marble",
+      "name": "Marble",
+      "lightColor": "#ffffff",
+      "darkColor": "#808080",
+      "description": "Elegant marble board",
+      "gradient": true
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "lightColor": "#e8d5c4",
+      "darkColor": "#2d5016",
+      "description": "Dark forest theme"
+    },
+    {
+      "id": "neon",
+      "name": "Neon",
+      "lightColor": "#1a1a2e",
+      "darkColor": "#0f3460",
+      "glowColor": "#00d4ff",
+      "description": "Cyberpunk neon"
+    },
+    {
+      "id": "twilight",
+      "name": "Twilight",
+      "lightColor": "#e1bee7",
+      "darkColor": "#4a148c",
+      "description": "Purple twilight"
+    }
+  ]
+}
