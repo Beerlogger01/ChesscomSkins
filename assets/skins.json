@@ -1,0 +1,11 @@
+{
+  "skins": [
+    {
+      "id": "set2",
+      "name": "Festive Classic",
+      "folder": "Set2",
+      "description": "Beautiful festive-themed chess pieces",
+      "previewPiece": "wk"
+    }
+  ]
+}

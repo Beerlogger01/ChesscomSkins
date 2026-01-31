@@ -1,0 +1,143 @@
+/* Crack asset source: https://github.com/feathericons/feather/blob/master/icons/zap.svg (MIT) */
+.chesscom-skins-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  contain: layout style paint;
+}
+
+.chesscom-crack-slot {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.chesscom-crack {
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/crack.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 80% 80%;
+  opacity: 0;
+  transform: scale(0.9) translateZ(0);
+  animation: crackPulse 1.6s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+.chesscom-crack.capture {
+  background-size: 95% 95%;
+  animation: crackCapture 1.8s ease-out forwards;
+}
+
+@keyframes crackPulse {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.85) translateZ(0); 
+  }
+  20% { 
+    opacity: 1; 
+    transform: scale(1) translateZ(0); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(1.05) translateZ(0); 
+  }
+}
+
+@keyframes crackCapture {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.8) translateZ(0); 
+  }
+  20% { 
+    opacity: 1; 
+    transform: scale(1.08) translateZ(0); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(1.15) translateZ(0); 
+  }
+}
+
+.chesscom-end-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Inter", sans-serif;
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(0,0,0,0.6);
+  background: radial-gradient(circle, rgba(20,10,0,0.5) 0%, rgba(0,0,0,0.85) 70%);
+  animation: endScreen 4s ease-out forwards;
+  contain: layout style paint;
+  will-change: opacity, transform;
+}
+
+.chesscom-end-screen.win {
+  color: #f8f1c8;
+  text-shadow: 0 0 24px rgba(255,200,80,0.8);
+}
+
+.chesscom-end-screen.lose {
+  color: #ffd7d7;
+  text-shadow: 0 0 24px rgba(255,90,90,0.8);
+}
+
+.chesscom-end-screen.draw {
+  color: #e5e5e5;
+  text-shadow: 0 0 24px rgba(200,200,200,0.8);
+}
+
+@keyframes endScreen {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.96); 
+  }
+  15% { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+  75% { 
+    opacity: 1; 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(1.05); 
+  }
+}
+
+/* Disabled state for cracks toggle container */
+.cracks-toggle.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ========== PARTICLES ========== */
+.particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,180,60,0.8), rgba(255,120,60,0.3));
+  box-shadow: 0 0 8px rgba(255,120,60,0.6);
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--vx) * 100px), calc(var(--vy) * 100px)) scale(0.3) translateZ(0);
+  }
+}

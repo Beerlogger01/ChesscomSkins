@@ -1,16 +1,17 @@
-
 {
   "manifest_version": 3,
   "name": "Chess.com Custom Skins",
   "version": "1.0",
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "Popup/popup.html"
   },
   "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": ["*://*.chess.com/*"],
-      "js": ["content.js"]
+      "js": ["content.js", "content-script.js"],
+      "css": ["styles.css"],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
