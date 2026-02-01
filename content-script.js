@@ -6,6 +6,7 @@ const activeCracks = [];
 
 let overlaysEnabled = false;
 let cracksEnabled = false;
+let particlesEnabled = false;
 let overlayRoot = null;
 let overlayBoard = null;
 let overlayOrientation = "white";
@@ -299,6 +300,38 @@ function spawnCrackEffect(square, isCapture, fallbackCenter = false) {
   });
 
   log("Crack spawn", { square, capture: isCapture });
+
+  // Возвращаем координаты центра, чтобы можно было запустить частицы
+  return {
+    x: position.x + position.size / 2,
+    y: position.y + position.size / 2
+  };
+}
+
+function spawnParticles(cx, cy, type = "normal") {
+  if (!overlayRoot) return;
+
+  const particleCount = type === "capture" ? 8 : 4;
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement("div");
+    particle.className = "particle";
+    particle.style.left = `${cx}px`;
+    particle.style.top = `${cy}px`;
+
+    const angle = (Math.PI * 2 * i) / particleCount;
+    const velocity = 2 + Math.random() * 3;
+    const vx = Math.cos(angle) * velocity;
+    const vy = Math.sin(angle) * velocity;
+
+    particle.style.setProperty("--vx", vx);
+    particle.style.setProperty("--vy", vy);
+
+    const duration = 600 + Math.random() * 400;
+    particle.style.animation = `particleFloat ${duration}ms ease-out forwards`;
+
+    overlayRoot.appendChild(particle);
+    setTimeout(() => particle.remove(), duration);
+  }
 }
 
 function handleMoveEvent(reason) {
@@ -341,13 +374,14 @@ function handleMoveEvent(reason) {
   lastTriggerKey = triggerKey;
 
   log("Move event", reason, { destination, capture, san, lastMoveSquares });
-  spawnCrackEffect(destination, capture, !destination);
+  const particleOrigin = spawnCrackEffect(destination, capture, !destination);
+  if (particlesEnabled && particleOrigin) {
+    spawnParticles(particleOrigin.x, particleOrigin.y, capture ? "capture" : "normal");
+  }
 }
 
 let lastBoardUpdateTime = 0;
 const BOARD_UPDATE_THROTTLE = 300; // ms - избегаем спама
-let lastBoardRect = null;
-let lastBoardOrientation = null;
 
 function invalidateBoardCache() {
   lastBoardRect = null;
@@ -478,9 +512,10 @@ function stopObservers() {
   }
 }
 
-chrome.storage.sync.get(["enabled", "cracksEnabled"], (data) => {
+chrome.storage.sync.get(["enabled", "cracksEnabled", "enabledFeatures"], (data) => {
   overlaysEnabled = !!data.enabled;
   cracksEnabled = !!data.cracksEnabled;
+  particlesEnabled = !!data.enabledFeatures?.particles;
   // Не запускаем bootstrap при document_start - ждём полной загрузки
   if (document.readyState === "complete") {
     if (overlaysEnabled) bootstrap();
@@ -501,6 +536,10 @@ chrome.storage.onChanged.addListener((changes) => {
     if (cracksEnabled && overlaysEnabled && !boardObserver) {
       bootstrap();
     }
+  }
+
+  if (changes.enabledFeatures) {
+    particlesEnabled = !!changes.enabledFeatures.newValue?.particles;
   }
 });
 

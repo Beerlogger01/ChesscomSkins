@@ -18,6 +18,7 @@ let particleStyleTag = null;
 let animationStyleTag = null;
 let tournamentMode = false;
 let currentTournamentSkin = null;
+let tournamentListenerAttached = false;
 
 // Загрузка доступных скинов из конфига
 async function loadSkinsConfig() {
@@ -59,8 +60,7 @@ async function loadFullConfig() {
 }
 
 // Инициализация конфигов при загрузке
-loadSkinsConfig();
-loadFullConfig();
+const configReady = Promise.all([loadSkinsConfig(), loadFullConfig()]);
 
 const EFFECT_DEFINITIONS = {
   "native-ember": {
@@ -426,28 +426,64 @@ function disableSkins() {
   lastAppliedTarget = null;
 }
 
-chrome.storage.sync.get(
-  ["enabled", "activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "activeSet"],
-  (data) => {
-  skinsEnabled = !!data.enabled;
-  if (!skinsEnabled) return;
+function clampIntensity(value, fallback = 1) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return Math.min(1, Math.max(0.1, numeric));
+  }
+  return fallback;
+}
 
-  let activeSkin = data.activeSkin;
-  let activeEffect = data.activeEffect;
-  const activeTarget = data.activeTarget || "all";
-  const skinPath = data.activeSkinPath;
-
-  if (data.activeSet && !activeSkin && !activeEffect) {
-    if (SKIN_DEFINITIONS[data.activeSet]) {
-      activeSkin = data.activeSet;
-    } else if (EFFECT_DEFINITIONS[data.activeSet]) {
-      activeEffect = data.activeSet;
-    }
+async function initializeFromStorage() {
+  try {
+    await configReady;
+  } catch (error) {
+    console.warn("[ChesscomSkins] Конфиги загружены с ошибками:", error);
   }
 
-  applySkin(activeSkin || "set2", skinPath || null);
-  applyEffect(activeEffect || "native-ember", activeTarget);
-});
+  chrome.storage.sync.get(
+    [
+      "enabled",
+      "activeSkin",
+      "activeEffect",
+      "activeTarget",
+      "activeSkinPath",
+      "activeSet",
+      "boardStyle",
+      "glowIntensity",
+      "enabledFeatures"
+    ],
+    (data) => {
+      skinsEnabled = !!data.enabled;
+      glowIntensity = clampIntensity(data.glowIntensity, glowIntensity);
+
+      let activeSkin = data.activeSkin;
+      let activeEffect = data.activeEffect;
+      const activeTarget = data.activeTarget || "all";
+      const skinPath = data.activeSkinPath;
+
+      if (data.activeSet && !activeSkin && !activeEffect) {
+        if (SKIN_DEFINITIONS[data.activeSet]) {
+          activeSkin = data.activeSet;
+        } else if (EFFECT_DEFINITIONS[data.activeSet]) {
+          activeEffect = data.activeSet;
+        }
+      }
+
+      if (skinsEnabled) {
+        applySkin(activeSkin || "set2", skinPath || null);
+        applyEffect(activeEffect || "native-ember", activeTarget);
+        applyBoardStyle(data.boardStyle || "default");
+
+        const features = data.enabledFeatures || {};
+        enablePieceAnimation(!!features.animation);
+        enableTournamentMode(!!features.tournament);
+      }
+    }
+  );
+}
+
+initializeFromStorage();
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled && changes.enabled.newValue === false) {
@@ -569,7 +605,7 @@ function watchForGameStart() {
 function applyBoardStyle(styleId) {
   if (boardStyleTag) boardStyleTag.remove();
   if (!styleId || styleId === "default" || !BOARD_STYLES[styleId]) {
-    BOARD_STYLES[styleId]?.id === styleId || loadDefaultBoardStyle();
+    loadDefaultBoardStyle();
     return;
   }
 
@@ -620,15 +656,10 @@ function loadDefaultBoardStyle() {
 
 // Интенсивность свечения (умножитель на opacity эффектов)
 function setGlowIntensity(intensity) {
-  glowIntensity = Math.max(0.1, Math.min(1, intensity));
-  // Пересоздаём эффект с новой интенсивностью
-  const currentEffect = chrome.storage.sync.get("activeEffect", (data) => {
-    if (data.activeEffect) {
-      chrome.storage.sync.get("activeTarget", (targetData) => {
-        applyEffect(data.activeEffect, targetData.activeTarget || "all");
-      });
-    }
-  });
+  glowIntensity = clampIntensity(intensity, glowIntensity);
+  if (lastAppliedEffect) {
+    applyEffect(lastAppliedEffect, lastAppliedTarget || "all");
+  }
 }
 
 // Анимации фигур (дыхание)
@@ -689,6 +720,13 @@ function enableTournamentMode(enabled) {
   tournamentMode = enabled;
   if (enabled) {
     selectRandomSkin();
+    if (!tournamentListenerAttached) {
+      window.addEventListener("beforeunload", selectRandomSkin);
+      tournamentListenerAttached = true;
+    }
+  } else if (tournamentListenerAttached) {
+    window.removeEventListener("beforeunload", selectRandomSkin);
+    tournamentListenerAttached = false;
   }
 }
 
@@ -736,6 +774,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       enableTournamentMode(enabled);
     }
     sendResponse({success: true});
+  }
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.boardStyle && changes.boardStyle.newValue) {
+    applyBoardStyle(changes.boardStyle.newValue);
+  }
+
+  if (changes.glowIntensity) {
+    setGlowIntensity(changes.glowIntensity.newValue);
+  }
+
+  if (changes.enabledFeatures) {
+    const features = changes.enabledFeatures.newValue || {};
+    enablePieceAnimation(!!features.animation);
+    enableTournamentMode(!!features.tournament);
   }
 });
 
