@@ -24,6 +24,23 @@ let enabledFeatures = {
   tournament: false
 };
 
+let stateLoaded = false;
+const DEFAULTS = {
+  enabled: false,
+  activeSet: null,
+  activeSkin: null,
+  activeEffect: "native-ember",
+  activeTarget: "all",
+  cracksEnabled: true,
+  glowIntensity: 1,
+  boardStyle: "default",
+  enabledFeatures: {
+    animation: false,
+    particles: false,
+    tournament: false
+  }
+};
+
 // Кэширование селекторов для производительности
 let cachedSelectors = {
   skinSets: null,
@@ -59,6 +76,8 @@ async function loadSkinsConfig() {
     if (config.skins && Array.isArray(config.skins)) {
       loadedSkins = config.skins;
       renderSkinsUI();
+      // После отрисовки скинов подтянем сохранённое состояние UI
+      await initStateFromStorage();
     }
   } catch (error) {
     console.error("[ChesscomSkins Popup] Ошибка загрузки конфига:", error);
@@ -107,6 +126,60 @@ function renderSkinsUI() {
   // Очищаем кэш и переинициализируем обработчики
   clearSelectorCache();
   initSkinHandlers();
+}
+
+async function initStateFromStorage() {
+  if (stateLoaded) return;
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(
+      ["enabled", "activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled", "glowIntensity", "boardStyle", "enabledFeatures"],
+      data => {
+        stateLoaded = true;
+        const merged = {
+          ...DEFAULTS,
+          ...data,
+          enabledFeatures: { ...DEFAULTS.enabledFeatures, ...(data.enabledFeatures || {}) }
+        };
+
+        toggle.checked = !!merged.enabled;
+        const activeSet = merged.activeSet && merged.activeSet !== "none" ? merged.activeSet : null;
+        const activeSkin = merged.activeSkin && merged.activeSkin !== "none" ? merged.activeSkin : null;
+        const activeEffect = merged.activeEffect && merged.activeEffect !== "none" ? merged.activeEffect : null;
+
+        currentActiveSkin = activeSkin || (activeSet && loadedSkins.length ? activeSet : null) || loadedSkins[0]?.id || null;
+        currentActiveEffect = activeEffect || DEFAULTS.activeEffect;
+        currentTarget = merged.activeTarget || DEFAULTS.activeTarget;
+        cracksEnabled = merged.cracksEnabled ?? DEFAULTS.cracksEnabled;
+        currentBoardStyle = merged.boardStyle || DEFAULTS.boardStyle;
+        enabledFeatures = merged.enabledFeatures;
+
+        // Устанавливаем интенсивность
+        if (glowIntensitySlider) {
+          const val = merged.glowIntensity ?? DEFAULTS.glowIntensity;
+          glowIntensitySlider.value = val;
+          intensityValue.textContent = Math.round(val * 100) + "%";
+        }
+
+        // Устанавливаем активный стиль доски
+        boardButtons.forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.board === currentBoardStyle);
+        });
+
+        // Устанавливаем активные фичи
+        featureButtons.forEach(btn => {
+          btn.classList.toggle("active", enabledFeatures[btn.dataset.feature]);
+        });
+
+        setActiveSkinUI(currentActiveSkin);
+        setActiveEffectUI(currentActiveEffect);
+        setActiveTargetUI(currentTarget);
+        setCracksUI(cracksEnabled);
+        updateEffectPreviews(currentActiveSkin || loadedSkins[0]?.id || "set2");
+        updateUI(toggle.checked);
+        resolve();
+      }
+    );
+  });
 }
 
 // Инициализация обработчиков для скинов
@@ -167,45 +240,8 @@ function initEffectHandlers() {
   });
 }
 
-chrome.storage.sync.get(
-  ["enabled", "activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled", "glowIntensity", "boardStyle", "enabledFeatures"],
-  data => {
-  toggle.checked = !!data.enabled;
-  
-  const activeSet = data.activeSet && data.activeSet !== "none" ? data.activeSet : null;
-  const activeSkin = data.activeSkin && data.activeSkin !== "none" ? data.activeSkin : null;
-  const activeEffect = data.activeEffect && data.activeEffect !== "none" ? data.activeEffect : null;
-
-  currentActiveSkin = activeSkin || (activeSet && loadedSkins.length ? activeSet : null);
-  currentActiveEffect = activeEffect;
-  currentTarget = data.activeTarget || "all";
-  cracksEnabled = !!data.cracksEnabled;
-  currentBoardStyle = data.boardStyle || "default";
-  enabledFeatures = data.enabledFeatures || enabledFeatures;
-  
-  // Устанавливаем интенсивность
-  if (glowIntensitySlider && data.glowIntensity) {
-    glowIntensitySlider.value = data.glowIntensity;
-    intensityValue.textContent = Math.round(data.glowIntensity * 100) + "%";
-  }
-  
-  // Устанавливаем активный стиль доски
-  boardButtons.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.board === currentBoardStyle);
-  });
-  
-  // Устанавливаем активные фичи
-  featureButtons.forEach(btn => {
-    btn.classList.toggle("active", enabledFeatures[btn.dataset.feature]);
-  });
-  
-  setActiveSkinUI(currentActiveSkin);
-  setActiveEffectUI(currentActiveEffect);
-  setActiveTargetUI(currentTarget);
-  setCracksUI(cracksEnabled);
-  updateEffectPreviews(currentActiveSkin || loadedSkins[0]?.id || "set2");
-  updateUI(toggle.checked);
-});
+// Первичная инициализация после загрузки конфига
+initStateFromStorage();
 
 toggle.addEventListener("change", () => {
   if (!toggle.checked) {
@@ -213,17 +249,35 @@ toggle.addEventListener("change", () => {
     updateUI(false);
   } else {
     chrome.storage.sync.get(
-      ["activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled"],
+      ["activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled", "boardStyle", "glowIntensity", "enabledFeatures"],
       (data) => {
-      chrome.storage.sync.set({ enabled: true });
+      // Устанавливаем дефолты, если ничего не сохранено
+      const merged = {
+        ...DEFAULTS,
+        ...data,
+        enabledFeatures: { ...DEFAULTS.enabledFeatures, ...(data.enabledFeatures || {}) }
+      };
+
+      const nextSkin = merged.activeSkin || merged.activeSet || loadedSkins[0]?.id || "set2";
+      chrome.storage.sync.set({
+        enabled: true,
+        activeSkin: nextSkin,
+        activeSet: nextSkin,
+        activeEffect: merged.activeEffect || DEFAULTS.activeEffect,
+        activeTarget: merged.activeTarget || DEFAULTS.activeTarget,
+        cracksEnabled: merged.cracksEnabled ?? DEFAULTS.cracksEnabled,
+        boardStyle: merged.boardStyle || DEFAULTS.boardStyle,
+        glowIntensity: merged.glowIntensity ?? DEFAULTS.glowIntensity,
+        enabledFeatures: merged.enabledFeatures
+      });
+
       updateUI(true);
-      const activeSet = data.activeSet && data.activeSet !== "none" ? data.activeSet : null;
-      const activeSkin = data.activeSkin && data.activeSkin !== "none" ? data.activeSkin : null;
-      const activeEffect = data.activeEffect && data.activeEffect !== "none" ? data.activeEffect : null;
-      currentActiveSkin = activeSkin || (activeSet && loadedSkins.length ? activeSet : null);
-      currentActiveEffect = activeEffect;
-      currentTarget = data.activeTarget || "all";
-      cracksEnabled = !!data.cracksEnabled;
+      currentActiveSkin = nextSkin;
+      currentActiveEffect = merged.activeEffect || DEFAULTS.activeEffect;
+      currentTarget = merged.activeTarget || DEFAULTS.activeTarget;
+      cracksEnabled = merged.cracksEnabled ?? DEFAULTS.cracksEnabled;
+      currentBoardStyle = merged.boardStyle || DEFAULTS.boardStyle;
+      enabledFeatures = merged.enabledFeatures;
       setActiveSkinUI(currentActiveSkin);
       setActiveEffectUI(currentActiveEffect);
       setActiveTargetUI(currentTarget);
@@ -273,6 +327,26 @@ function updateUI(enabled) {
     if (cracksContainer) {
       cracksContainer.classList.toggle("disabled", !enabled);
     }
+  }
+
+  const glowControl = document.querySelector(".glow-intensity-control");
+  if (glowControl) {
+    glowControl.classList.toggle("disabled", !enabled);
+  }
+
+  const boardControl = document.querySelector(".board-styles-control");
+  if (boardControl) {
+    boardControl.classList.toggle("disabled", !enabled);
+  }
+
+  const featureControl = document.querySelector(".features-toggle");
+  if (featureControl) {
+    featureControl.classList.toggle("disabled", !enabled);
+  }
+
+  const importExport = document.querySelector(".import-export-section");
+  if (importExport) {
+    importExport.classList.toggle("disabled", !enabled);
   }
 }
 

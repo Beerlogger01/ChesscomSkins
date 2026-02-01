@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 const LOG_PREFIX = "[ChesscomSkins]";
 
 const MAX_ACTIVE_CRACKS = 4;
@@ -336,6 +336,10 @@ function spawnParticles(cx, cy, type = "normal") {
 
 function handleMoveEvent(reason) {
   if (!cracksEnabled) return;
+  // защитим от слишком частых вызовов: throttle через lastBoardUpdateTime
+  const now = Date.now();
+  if (now - lastBoardUpdateTime < BOARD_UPDATE_THROTTLE) return;
+  lastBoardUpdateTime = now;
   const board = getBoardElement();
   if (!board) return;
   ensureOverlay(board);
@@ -514,8 +518,12 @@ function stopObservers() {
 
 chrome.storage.sync.get(["enabled", "cracksEnabled", "enabledFeatures"], (data) => {
   overlaysEnabled = !!data.enabled;
-  cracksEnabled = !!data.cracksEnabled;
+  const hasCracksKey = Object.prototype.hasOwnProperty.call(data, "cracksEnabled");
+  cracksEnabled = hasCracksKey ? !!data.cracksEnabled : true; // по умолчанию включаем трещины
   particlesEnabled = !!data.enabledFeatures?.particles;
+  if (!hasCracksKey) {
+    chrome.storage.sync.set({ cracksEnabled });
+  }
   // Не запускаем bootstrap при document_start - ждём полной загрузки
   if (document.readyState === "complete") {
     if (overlaysEnabled) bootstrap();

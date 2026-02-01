@@ -19,6 +19,7 @@ let animationStyleTag = null;
 let tournamentMode = false;
 let currentTournamentSkin = null;
 let tournamentListenerAttached = false;
+let effectsEnabled = false;
 
 // Загрузка доступных скинов из конфига
 async function loadSkinsConfig() {
@@ -63,42 +64,30 @@ async function loadFullConfig() {
 const configReady = Promise.all([loadSkinsConfig(), loadFullConfig()]);
 
 const EFFECT_DEFINITIONS = {
-  "native-ember": {
-    type: "filter",
-    filter: "hue-rotate(-18deg) saturate(1.4) brightness(1.05)",
-    ringColor: "rgba(255,120,60,0.9)"
-  },
-  "native-frost": {
-    type: "filter",
-    filter: "hue-rotate(190deg) saturate(1.35) brightness(1.1)",
-    ringColor: "rgba(110,190,255,0.9)"
-  },
-  "native-neon": {
-    type: "filter",
-    filter: "hue-rotate(280deg) saturate(1.6) brightness(1.1)",
-    ringColor: "rgba(210,120,255,0.9)"
-  },
-  "legendary-ember": {
-    type: "filter",
-    filter: "saturate(1.1) brightness(1.02)",
-    ringColor: "rgba(255,130,70,0.95)",
-    ringGlow: "0 0 18px rgba(255,120,60,0.7)",
-    ringColorOverrides: {
-      wk: "rgba(255,210,120,0.95)",
-      wq: "rgba(255,160,80,0.95)",
-      bk: "rgba(120,180,255,0.95)",
-      bq: "rgba(150,120,255,0.95)"
-    }
-  },
   "minimal": {
     type: "filter",
     filter: "saturate(1.02)",
-    ringColor: "rgba(255,255,255,0.9)",
-    ringOpacity: 0.75,
+    ringColor: "rgba(255,255,255,0.8)",
+    ringOpacity: 0.65,
     ringBorder: "2px",
-    ringInset: "12%",
-    ringAnimation: "ringSoft 1.6s ease-in-out infinite",
-    ringGlow: "0 0 12px rgba(255,255,255,0.55)"
+    ringInset: "14%",
+    ringAnimation: "ringSoft 1.8s ease-in-out infinite",
+    ringGlow: "0 0 8px rgba(255,255,255,0.35)"
+  },
+  "native-ember": {
+    type: "filter",
+    filter: "hue-rotate(-12deg) saturate(1.2) brightness(1.02)",
+    ringColor: "rgba(255,120,60,0.75)"
+  },
+  "native-frost": {
+    type: "filter",
+    filter: "hue-rotate(185deg) saturate(1.2) brightness(1.05)",
+    ringColor: "rgba(110,190,255,0.75)"
+  },
+  "native-neon": {
+    type: "filter",
+    filter: "hue-rotate(270deg) saturate(1.3) brightness(1.05)",
+    ringColor: "rgba(210,120,255,0.75)"
   },
   "none": {
     type: "none"
@@ -176,7 +165,12 @@ function ensureCapturedObserver() {
   };
   
   capturedObserver = new MutationObserver(debouncedUpdate);
-  capturedObserver.observe(document.body, { childList: true, subtree: true });
+  const targets = document.querySelectorAll('.captured-pieces, [class*="captured"], .board');
+  if (targets.length) {
+    targets.forEach((node) => capturedObserver.observe(node, { childList: true, subtree: true }));
+  } else {
+    capturedObserver.observe(document.body, { childList: true, subtree: true });
+  }
 }
 
 function updateCapturedImages() {
@@ -205,6 +199,8 @@ function updateCapturedImages() {
 
 function applyEffect(effectName, targetName) {
   if (lastAppliedEffect === effectName && lastAppliedTarget === targetName) return;
+  // если эффекты временно отключены (оптимизация), не применять
+  if (!effectsEnabled && effectName !== "none") return;
   lastAppliedEffect = effectName;
   lastAppliedTarget = targetName;
 
@@ -229,18 +225,13 @@ function applyEffect(effectName, targetName) {
   const glowTargetCapture = glowTargets.map((target) => `${target}.capture, .capture ${target}`).join(", ");
 
   let css = `
-    .piece,
-    .promotion-piece {
+    ${glowTargetSelector} {
       position: relative;
       contain: paint;
       transform: translateZ(0);
       --glow-intensity: ${glowIntensity};
-    }
-
-    /* Базовый фильтр (не анимируется) */
-    ${glowTargetSelector} {
       filter: var(--piece-filter, none);
-      transition: filter 0.15s ease;
+      transition: filter 0.2s ease;
     }
 
     /* Отключаем эффекты для захватанных фигур */
@@ -362,8 +353,8 @@ function applyEffect(effectName, targetName) {
 
     /* Применяем анимации только к активным фигурам */
     ${glowTargetActive} {
-      animation: ${ringAnimation}, glowShimmer 3.2s ease-in-out infinite;
-      will-change: filter, transform;
+      animation: ${ringAnimation};
+      will-change: filter;
     }
 
     ${glowTargetCheck} {
@@ -380,7 +371,7 @@ function applyEffect(effectName, targetName) {
     }
 
     ${glowTargetCapture} {
-      animation: captureBurst 0.9s ease-out;
+      animation: captureBurst 0.7s ease-out;
       will-change: transform, opacity;
     }
 
@@ -456,6 +447,7 @@ async function initializeFromStorage() {
     (data) => {
       skinsEnabled = !!data.enabled;
       glowIntensity = clampIntensity(data.glowIntensity, glowIntensity);
+      effectsEnabled = true; // разрешаем применять эффекты после первого чтения state
 
       let activeSkin = data.activeSkin;
       let activeEffect = data.activeEffect;
@@ -470,15 +462,15 @@ async function initializeFromStorage() {
         }
       }
 
-      if (skinsEnabled) {
-        applySkin(activeSkin || "set2", skinPath || null);
-        applyEffect(activeEffect || "native-ember", activeTarget);
-        applyBoardStyle(data.boardStyle || "default");
+        if (skinsEnabled) {
+          applySkin(activeSkin || "set2", skinPath || null);
+          applyEffect(activeEffect || "minimal", activeTarget);
+          applyBoardStyle(data.boardStyle || "default");
 
-        const features = data.enabledFeatures || {};
-        enablePieceAnimation(!!features.animation);
-        enableTournamentMode(!!features.tournament);
-      }
+          const features = data.enabledFeatures || {};
+          enablePieceAnimation(!!features.animation);
+          enableTournamentMode(!!features.tournament);
+        }
     }
   );
 }
@@ -495,10 +487,15 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled && changes.enabled.newValue === true) {
     skinsEnabled = true;
     chrome.storage.sync.get(
-      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath"],
+      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "boardStyle", "glowIntensity", "enabledFeatures"],
       (data) => {
       applySkin(data.activeSkin || "set2", data.activeSkinPath || null);
       applyEffect(data.activeEffect || "native-ember", data.activeTarget || "all");
+      applyBoardStyle(data.boardStyle || "default");
+      if (data.glowIntensity) setGlowIntensity(data.glowIntensity);
+      const features = data.enabledFeatures || {};
+      enablePieceAnimation(!!features.animation);
+      enableTournamentMode(!!features.tournament);
     });
     return;
   }
@@ -613,11 +610,20 @@ function applyBoardStyle(styleId) {
   boardStyleTag = document.createElement("style");
   
   let css = `
-    .board-square-light {
+    /* Основные классы chess.com */
+    .board .light,
+    .board .light-square,
+    .board .square.light,
+    .board .square.light-square,
+    .board .board-square-light {
       background-color: ${style.lightColor} !important;
     }
     
-    .board-square-dark {
+    .board .dark,
+    .board .dark-square,
+    .board .square.dark,
+    .board .square.dark-square,
+    .board .board-square-dark {
       background-color: ${style.darkColor} !important;
     }
   `;
@@ -625,10 +631,18 @@ function applyBoardStyle(styleId) {
   // Для neon стиля добавляем свечение
   if (styleId === "neon" && style.glowColor) {
     css += `
-      .board-square-light {
+      .board .light,
+      .board .light-square,
+      .board .square.light,
+      .board .square.light-square,
+      .board .board-square-light {
         box-shadow: inset 0 0 10px ${style.glowColor} !important;
       }
-      .board-square-dark {
+      .board .dark,
+      .board .dark-square,
+      .board .square.dark,
+      .board .square.dark-square,
+      .board .board-square-dark {
         box-shadow: inset 0 0 15px ${style.glowColor} !important;
       }
     `;
@@ -648,8 +662,16 @@ function loadDefaultBoardStyle() {
   };
   
   boardStyleTag.textContent = `
-    .board-square-light { background-color: ${defaultStyle.lightColor} !important; }
-    .board-square-dark { background-color: ${defaultStyle.darkColor} !important; }
+    .board .light,
+    .board .light-square,
+    .board .square.light,
+    .board .square.light-square,
+    .board .board-square-light { background-color: ${defaultStyle.lightColor} !important; }
+    .board .dark,
+    .board .dark-square,
+    .board .square.dark,
+    .board .square.dark-square,
+    .board .board-square-dark { background-color: ${defaultStyle.darkColor} !important; }
   `;
   document.head.appendChild(boardStyleTag);
 }
