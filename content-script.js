@@ -1,579 +1,516 @@
-const DEBUG = false;
-const LOG_PREFIX = "[ChesscomSkins]";
+// ============================================
+// ChesscomSkins - Content Script (Animations)
+// Трещины и частицы для ходов
+// ============================================
 
-const MAX_ACTIVE_CRACKS = 4;
-const activeCracks = [];
-
-let overlaysEnabled = false;
 let cracksEnabled = false;
 let particlesEnabled = false;
-let overlayRoot = null;
-let overlayBoard = null;
-let overlayOrientation = "white";
-let lastBoardSnapshot = new Map();
-let lastMoveSignature = "";
-let lastKnownDestination = null;
-let lastTriggerKey = "";
-let boardObserver = null;
-let moveListObserver = null;
-let statusObserver = null;
-let resizeBound = false;
+let boardElement = null;
+let animationCanvas = null;
+let animationCtx = null;
+let particles = [];
+let cracks = [];
+let animationFrame = null;
 
-function log(...args) {
-  if (DEBUG) console.log(LOG_PREFIX, ...args);
-}
+// ============================================
+// Поиск доски
+// ============================================
 
-function warn(...args) {
-  if (DEBUG) console.warn(LOG_PREFIX, ...args);
-}
-
-function getBoardElement() {
-  return document.querySelector(
-    ".board, chess-board, .board-area, .board-container, .board-wrapper"
-  );
-}
-
-function getBoardOrientation(board) {
-  if (!board) return "white";
-  const classList = board.className || "";
-  if (classList.includes("flipped") || classList.includes("orientation-black")) {
-    return "black";
-  }
-  const orientationAttr = board.getAttribute("data-orientation");
-  if (orientationAttr === "black") return "black";
-  return "white";
-}
-
-function ensureOverlay(board) {
-  if (!board) return null;
-  if (overlayRoot && overlayBoard === board) return overlayRoot;
-
-  overlayBoard = board;
-  overlayOrientation = getBoardOrientation(board);
-
-  if (overlayRoot) overlayRoot.remove();
-
-  const overlay = document.createElement("div");
-  overlay.className = "chesscom-skins-overlay";
-  const parent = board.parentElement || board;
-  if (getComputedStyle(parent).position === "static") {
-    parent.style.position = "relative";
-  }
-  parent.appendChild(overlay);
-  overlayRoot = overlay;
-  resizeOverlay();
-  return overlayRoot;
-}
-
-function resizeOverlay() {
-  if (!overlayRoot || !overlayBoard) return;
-  const rect = overlayBoard.getBoundingClientRect();
-  const parentRect = overlayRoot.parentElement.getBoundingClientRect();
-  overlayRoot.style.width = `${rect.width}px`;
-  overlayRoot.style.height = `${rect.height}px`;
-  overlayRoot.style.left = `${rect.left - parentRect.left}px`;
-  overlayRoot.style.top = `${rect.top - parentRect.top}px`;
-}
-
-function squareFromClass(classList) {
-  if (!classList) return null;
-  for (const cls of Array.from(classList)) {
-    const match = cls.match(/square-([a-h])([1-8])/i);
-    if (match) return `${match[1].toLowerCase()}${match[2]}`;
-    const numeric = cls.match(/square-(\d)(\d)/);
-    if (numeric) {
-      const file = String.fromCharCode(96 + Number(numeric[1]));
-      return `${file}${numeric[2]}`;
+function findBoard() {
+  // Ищем разные варианты контейнера доски
+  const selectors = [
+    "wc-chess-board",
+    ".board",
+    "[class*='board-layout']",
+    "chess-board"
+  ];
+  
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      return element;
     }
   }
   return null;
 }
 
-function squareFromTransform(el, boardRect, orientation) {
-  const transform = el.style.transform || "";
-  const match = transform.match(/translate(?:3d)?\(([-\d.]+)px,\s*([-\d.]+)px/);
-  if (!match) return null;
-  const x = parseFloat(match[1]);
-  const y = parseFloat(match[2]);
-  const size = Math.min(boardRect.width, boardRect.height) / 8;
-  if (!size) return null;
-  const fileIndex = Math.floor(x / size);
-  const rankIndex = Math.floor(y / size);
-  if (fileIndex < 0 || fileIndex > 7 || rankIndex < 0 || rankIndex > 7) return null;
-  let file;
-  let rank;
-  if (orientation === "white") {
-    file = String.fromCharCode(97 + fileIndex);
-    rank = 8 - rankIndex;
-  } else {
-    file = String.fromCharCode(97 + (7 - fileIndex));
-    rank = rankIndex + 1;
-  }
-  return `${file}${rank}`;
-}
+// ============================================
+// Создание canvas для эффектов
+// ============================================
 
-let lastBoardRect = null;
-let lastBoardOrientation = null;
-
-function parseBoardState() {
-  const board = getBoardElement();
-  if (!board) return new Map();
+function createCanvas() {
+  if (animationCanvas) return animationCanvas;
   
-  // Кэшируем дорогостоящие вычисления - их не нужно вычислять каждый раз
-  if (!lastBoardRect) lastBoardRect = board.getBoundingClientRect();
-  if (!lastBoardOrientation) lastBoardOrientation = getBoardOrientation(board);
+  boardElement = findBoard();
+  if (!boardElement) {
+    console.log("[ChesscomSkins:Animations] Board not found");
+    return null;
+  }
   
-  const rect = lastBoardRect;
-  const orientation = lastBoardOrientation;
-  const pieces = new Map();
-  const pieceNodes = board.querySelectorAll(".piece"); // Убираем [data-piece] - редко используется
+  // Получаем размеры доски
+  const rect = boardElement.getBoundingClientRect();
+  
+  animationCanvas = document.createElement("canvas");
+  animationCanvas.id = "chesscom-skins-animation-canvas";
+  animationCanvas.width = rect.width;
+  animationCanvas.height = rect.height;
+  animationCanvas.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+  `;
+  
+  // Добавляем относительное позиционирование родителю если нет
+  const computedStyle = window.getComputedStyle(boardElement);
+  if (computedStyle.position === "static") {
+    boardElement.style.position = "relative";
+  }
+  
+  boardElement.appendChild(animationCanvas);
+  animationCtx = animationCanvas.getContext("2d");
+  
+  console.log("[ChesscomSkins:Animations] Canvas created:", rect.width, "x", rect.height);
+  
+  return animationCanvas;
+}
 
-  pieceNodes.forEach((piece) => {
-    const dataPiece = piece.dataset?.piece;
-    const pieceClass = Array.from(piece.classList).find((cls) => /[bw][kqrbnp]/.test(cls));
-    const pieceCode = dataPiece || pieceClass;
-    if (!pieceCode) return;
+// ============================================
+// Класс частицы
+// ============================================
 
-    let square = piece.dataset?.square || squareFromClass(piece.classList);
-    if (!square && rect.width) {
-      square = squareFromTransform(piece, rect, orientation);
+class Particle {
+  constructor(x, y, color) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.vx = (Math.random() - 0.5) * 8;
+    this.vy = (Math.random() - 0.5) * 8;
+    this.life = 1.0;
+    this.decay = 0.02 + Math.random() * 0.02;
+    this.size = 2 + Math.random() * 4;
+  }
+  
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.15; // гравитация
+    this.vx *= 0.98; // трение
+    this.life -= this.decay;
+    this.size *= 0.97;
+  }
+  
+  draw(ctx) {
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  isDead() {
+    return this.life <= 0 || this.size < 0.5;
+  }
+}
+
+// ============================================
+// Класс трещины
+// ============================================
+
+class Crack {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.segments = [];
+    this.life = 1.0;
+    this.decay = 0.008;
+    
+    // Генерируем сегменты трещины
+    this.generateSegments();
+  }
+  
+  generateSegments() {
+    const numBranches = 3 + Math.floor(Math.random() * 3);
+    
+    for (let b = 0; b < numBranches; b++) {
+      const angle = (Math.PI * 2 / numBranches) * b + (Math.random() - 0.5) * 0.5;
+      const length = 30 + Math.random() * 40;
+      const segments = [];
+      
+      let cx = this.x;
+      let cy = this.y;
+      let currentAngle = angle;
+      
+      const numSegs = 3 + Math.floor(Math.random() * 3);
+      for (let s = 0; s < numSegs; s++) {
+        const segLen = length / numSegs;
+        const nx = cx + Math.cos(currentAngle) * segLen;
+        const ny = cy + Math.sin(currentAngle) * segLen;
+        segments.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+        cx = nx;
+        cy = ny;
+        currentAngle += (Math.random() - 0.5) * 0.8;
+      }
+      
+      this.segments.push(segments);
     }
-    if (!square) return;
-    pieces.set(square, pieceCode);
-  });
-
-  return pieces;
-}
-
-function findLastMoveSquares() {
-  const board = getBoardElement();
-  if (!board) return [];
-  const candidates = board.querySelectorAll(".last-move, [class*='last-move']");
-  const squares = [];
-  candidates.forEach((el) => {
-    const square = el.dataset?.square || squareFromClass(el.classList);
-    if (square) squares.push(square);
-  });
-  return squares;
-}
-
-function findMoveList() {
-  return document.querySelector(
-    ".vertical-move-list, .move-list, [data-cy='move-list'], [role='log']"
-  );
-}
-
-function extractLatestSAN() {
-  const moveList = findMoveList();
-  if (!moveList) return "";
-  const text = moveList.textContent || "";
-  const tokens = text.trim().split(/\s+/);
-  return tokens[tokens.length - 1] || "";
-}
-
-function parseSANForCapture(san) {
-  return san.includes("x");
-}
-
-function parseSANForSquare(san) {
-  const matches = san.match(/([a-h][1-8])/gi);
-  if (!matches || matches.length === 0) return null;
-  return matches[matches.length - 1].toLowerCase();
-}
-
-function detectMoveByDiff(prevMap, nextMap) {
-  const fromSquares = [];
-  const toSquares = [];
-  const captures = [];
-
-  prevMap.forEach((piece, square) => {
-    if (!nextMap.has(square)) {
-      fromSquares.push({ square, piece });
-    }
-  });
-
-  nextMap.forEach((piece, square) => {
-    if (!prevMap.has(square)) {
-      toSquares.push({ square, piece });
-    } else if (prevMap.get(square) !== piece) {
-      toSquares.push({ square, piece });
-      captures.push(square);
-    }
-  });
-
-  if (fromSquares.length === 1 && toSquares.length === 1) {
-    return {
-      from: fromSquares[0].square,
-      to: toSquares[0].square,
-      capture: captures.length > 0
-    };
   }
+  
+  update() {
+    this.life -= this.decay;
+  }
+  
+  draw(ctx) {
+    ctx.globalAlpha = this.life;
+    ctx.strokeStyle = "rgba(50, 50, 50, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    
+    this.segments.forEach(branch => {
+      ctx.beginPath();
+      branch.forEach((seg, i) => {
+        if (i === 0) {
+          ctx.moveTo(seg.x1, seg.y1);
+        }
+        ctx.lineTo(seg.x2, seg.y2);
+      });
+      ctx.stroke();
+    });
+    
+    // Внутренняя светлая линия
+    ctx.strokeStyle = "rgba(200, 200, 200, 0.5)";
+    ctx.lineWidth = 1;
+    
+    this.segments.forEach(branch => {
+      ctx.beginPath();
+      branch.forEach((seg, i) => {
+        if (i === 0) {
+          ctx.moveTo(seg.x1, seg.y1);
+        }
+        ctx.lineTo(seg.x2, seg.y2);
+      });
+      ctx.stroke();
+    });
+  }
+  
+  isDead() {
+    return this.life <= 0;
+  }
+}
 
-  if (fromSquares.length === 2 && toSquares.length === 2) {
-    const kingMove = toSquares.find((item) => item.piece.endsWith("k"));
-    if (kingMove) {
-      return {
-        from: fromSquares.find((item) => item.piece.endsWith("k"))?.square || fromSquares[0].square,
-        to: kingMove.square,
-        capture: false
-      };
+// ============================================
+// Создание эффекта в точке
+// ============================================
+
+function createEffectAt(x, y) {
+  if (!animationCanvas) {
+    if (!createCanvas()) return;
+  }
+  
+  const colors = ["#ff6b35", "#ff9f1c", "#ffbe0b", "#ffffff"];
+  
+  // Создаём частицы
+  if (particlesEnabled) {
+    for (let i = 0; i < 15; i++) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      particles.push(new Particle(x, y, color));
     }
   }
-
-  if (fromSquares.length === 1 && toSquares.length === 1) {
-    const movedPiece = toSquares[0].piece;
-    if (movedPiece.endsWith("p")) {
-      const fromFile = fromSquares[0].square[0];
-      const toFile = toSquares[0].square[0];
-      return {
-        from: fromSquares[0].square,
-        to: toSquares[0].square,
-        capture: fromFile !== toFile
-      };
-    }
+  
+  // Создаём трещину
+  if (cracksEnabled) {
+    cracks.push(new Crack(x, y));
   }
-
-  return null;
-}
-
-function squareToPosition(square, board, orientation) {
-  if (!square || !board) return null;
-  const rect = board.getBoundingClientRect();
-  const file = square.charCodeAt(0) - 97;
-  const rank = parseInt(square[1], 10) - 1;
-  const size = Math.min(rect.width, rect.height) / 8;
-  if (!size) return null;
-
-  let fileIndex = file;
-  let rankIndex = rank;
-  if (orientation === "white") {
-    rankIndex = 7 - rank;
-  } else {
-    fileIndex = 7 - file;
-  }
-
-  const x = fileIndex * size;
-  const y = rankIndex * size;
-  return { x, y, size };
-}
-
-function spawnCrackEffect(square, isCapture, fallbackCenter = false) {
-  if (!overlayRoot || !overlayBoard) return;
-  resizeOverlay();
-  const orientation = overlayOrientation;
-  let position = null;
-
-  if (square && !fallbackCenter) {
-    position = squareToPosition(square, overlayBoard, orientation);
-  }
-
-  if (!position) {
-    const rect = overlayBoard.getBoundingClientRect();
-    const size = Math.min(rect.width, rect.height) / 8;
-    position = { x: rect.width / 2 - size / 2, y: rect.height / 2 - size / 2, size };
-  }
-
-  const slot = document.createElement("div");
-  slot.className = "chesscom-crack-slot";
-  slot.style.left = `${position.x}px`;
-  slot.style.top = `${position.y}px`;
-  slot.style.width = `${position.size}px`;
-  slot.style.height = `${position.size}px`;
-  slot.style.borderRadius = `${Math.max(position.size * 0.08, 4)}px`;
-
-  const crack = document.createElement("div");
-  crack.className = "chesscom-crack";
-  if (isCapture) crack.classList.add("capture");
-  slot.appendChild(crack);
-  overlayRoot.appendChild(slot);
-
-  activeCracks.push(slot);
-  if (activeCracks.length > MAX_ACTIVE_CRACKS) {
-    const oldest = activeCracks.shift();
-    if (oldest) oldest.remove();
-  }
-
-  crack.addEventListener("animationend", () => {
-    slot.remove();
-    const index = activeCracks.indexOf(slot);
-    if (index !== -1) activeCracks.splice(index, 1);
-  });
-
-  log("Crack spawn", { square, capture: isCapture });
-
-  // Возвращаем координаты центра, чтобы можно было запустить частицы
-  return {
-    x: position.x + position.size / 2,
-    y: position.y + position.size / 2
-  };
-}
-
-function spawnParticles(cx, cy, type = "normal") {
-  if (!overlayRoot) return;
-
-  const particleCount = type === "capture" ? 8 : 4;
-  for (let i = 0; i < particleCount; i++) {
-    const particle = document.createElement("div");
-    particle.className = "particle";
-    particle.style.left = `${cx}px`;
-    particle.style.top = `${cy}px`;
-
-    const angle = (Math.PI * 2 * i) / particleCount;
-    const velocity = 2 + Math.random() * 3;
-    const vx = Math.cos(angle) * velocity;
-    const vy = Math.sin(angle) * velocity;
-
-    particle.style.setProperty("--vx", vx);
-    particle.style.setProperty("--vy", vy);
-
-    const duration = 600 + Math.random() * 400;
-    particle.style.animation = `particleFloat ${duration}ms ease-out forwards`;
-
-    overlayRoot.appendChild(particle);
-    setTimeout(() => particle.remove(), duration);
+  
+  // Запускаем анимацию если не запущена
+  if (!animationFrame) {
+    animate();
   }
 }
 
-function handleMoveEvent(reason) {
-  if (!cracksEnabled) return;
-  // защитим от слишком частых вызовов: throttle через lastBoardUpdateTime
-  const now = Date.now();
-  if (now - lastBoardUpdateTime < BOARD_UPDATE_THROTTLE) return;
-  lastBoardUpdateTime = now;
-  const board = getBoardElement();
-  if (!board) return;
-  ensureOverlay(board);
-  if (!overlayRoot) {
-    warn("Overlay missing; cannot spawn cracks");
+// ============================================
+// Анимационный цикл
+// ============================================
+
+function animate() {
+  if (!animationCtx || !animationCanvas) {
+    animationFrame = null;
     return;
   }
-
-  const san = extractLatestSAN();
-  const lastMoveSquares = findLastMoveSquares();
-  let destination = lastMoveSquares[lastMoveSquares.length - 1] || null;
-  const captureFromSan = san ? parseSANForCapture(san) : false;
-  const destFromSan = san ? parseSANForSquare(san) : null;
-
-  if (!destination && destFromSan) {
-    destination = destFromSan;
-  }
-
-  const nextSnapshot = parseBoardState();
-  const diff = detectMoveByDiff(lastBoardSnapshot, nextSnapshot);
-  lastBoardSnapshot = nextSnapshot;
-
-  let capture = captureFromSan;
-  if (diff) {
-    destination = diff.to || destination;
-    capture = diff.capture || capture;
-    lastKnownDestination = destination;
-  }
-
-  if (!destination && lastKnownDestination) {
-    destination = lastKnownDestination;
-  }
-
-  const triggerKey = `${destination || "center"}-${capture}-${san || ""}-${lastMoveSquares.join(",")}`;
-  if (triggerKey === lastTriggerKey) return;
-  lastTriggerKey = triggerKey;
-
-  log("Move event", reason, { destination, capture, san, lastMoveSquares });
-  const particleOrigin = spawnCrackEffect(destination, capture, !destination);
-  if (particlesEnabled && particleOrigin) {
-    spawnParticles(particleOrigin.x, particleOrigin.y, capture ? "capture" : "normal");
+  
+  animationCtx.clearRect(0, 0, animationCanvas.width, animationCanvas.height);
+  
+  // Обновляем и рисуем частицы
+  particles = particles.filter(p => {
+    p.update();
+    if (!p.isDead()) {
+      p.draw(animationCtx);
+      return true;
+    }
+    return false;
+  });
+  
+  // Обновляем и рисуем трещины
+  cracks = cracks.filter(c => {
+    c.update();
+    if (!c.isDead()) {
+      c.draw(animationCtx);
+      return true;
+    }
+    return false;
+  });
+  
+  // Сбрасываем альфу
+  animationCtx.globalAlpha = 1.0;
+  
+  // Продолжаем анимацию если есть что анимировать
+  if (particles.length > 0 || cracks.length > 0) {
+    animationFrame = requestAnimationFrame(animate);
+  } else {
+    animationFrame = null;
   }
 }
 
-let lastBoardUpdateTime = 0;
-const BOARD_UPDATE_THROTTLE = 300; // ms - избегаем спама
+// ============================================
+// Отслеживание ходов
+// ============================================
 
-function invalidateBoardCache() {
-  lastBoardRect = null;
-  lastBoardOrientation = null;
-}
+let moveObserver = null;
+let lastMoveSquare = null;
+let lastPiecePositions = new Map();
 
-function updateMoveSignature() {
-  const moveList = findMoveList();
-  const signature = moveList ? moveList.textContent?.trim() : "";
-  if (signature && signature !== lastMoveSignature) {
-    lastMoveSignature = signature;
-    invalidateBoardCache(); // Сбрасываем кэш при изменении доски
-    handleMoveEvent("move-list");
+function startMoveObserver() {
+  if (moveObserver) return;
+  
+  const board = findBoard();
+  if (!board) {
+    console.log("[ChesscomSkins:Animations] Cannot start observer - no board");
+    // Попробуем позже
+    setTimeout(startMoveObserver, 2000);
+    return;
   }
-}
-
-function observeBoard() {
-  const board = getBoardElement();
-  if (!board) return;
-  if (boardObserver && overlayBoard === board) return;
-  if (boardObserver) boardObserver.disconnect();
-
-  boardObserver = new MutationObserver(() => {
-    // Дебаунс: не вызываем handleMoveEvent чаще чем раз в 300ms
-    const now = Date.now();
-    if (now - lastBoardUpdateTime < BOARD_UPDATE_THROTTLE) return;
-    lastBoardUpdateTime = now;
+  
+  // Сохраняем начальные позиции фигур
+  updatePiecePositions(board);
+  
+  moveObserver = new MutationObserver((mutations) => {
+    let shouldCheckPieces = false;
     
-    invalidateBoardCache(); // Сбрасываем кэш
-    handleMoveEvent("board-highlight");
+    for (const mutation of mutations) {
+      // Проверяем изменения атрибутов (например, style или class)
+      if (mutation.type === "attributes") {
+        const target = mutation.target;
+        
+        // Если это фигура и изменился её стиль (позиция)
+        if (target.classList && target.classList.contains("piece")) {
+          shouldCheckPieces = true;
+        }
+        
+        // Подсветка хода (highlight)
+        if (target.classList && (
+          target.classList.contains("highlight") ||
+          target.classList.contains("hint") ||
+          target.classList.contains("last-move")
+        )) {
+          triggerEffectOnElement(target, board);
+        }
+      }
+      
+      // Проверяем добавление новых элементов
+      if (mutation.type === "childList") {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === 1) { // Element
+            // Подсветка
+            if (node.classList && (
+              node.classList.contains("highlight") ||
+              node.classList.contains("last-move")
+            )) {
+              triggerEffectOnElement(node, board);
+            }
+            
+            // Новая фигура = ход
+            if (node.classList && node.classList.contains("piece")) {
+              shouldCheckPieces = true;
+            }
+          }
+        });
+      }
+    }
+    
+    // Проверяем изменились ли позиции фигур
+    if (shouldCheckPieces) {
+      checkForMoves(board);
+    }
   });
-  boardObserver.observe(board, { subtree: true, attributes: true, childList: true });
-  overlayBoard = board;
-}
-
-function observeMoveList() {
-  const moveList = findMoveList();
-  if (!moveList) return;
-  if (moveListObserver) moveListObserver.disconnect();
-
-  moveListObserver = new MutationObserver(() => {
-    updateMoveSignature();
+  
+  moveObserver.observe(board, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class", "style", "transform"]
   });
-  moveListObserver.observe(moveList, { childList: true, subtree: true, characterData: true });
+  
+  console.log("[ChesscomSkins:Animations] Move observer started on", board.tagName);
 }
 
-function detectEndState(text) {
-  const lowered = text.toLowerCase();
-  const patterns = [
-    { key: "win", regex: /(you won|victory|checkmate)/ },
-    { key: "lose", regex: /(you lost|defeat|resigned|time|timeout)/ },
-    { key: "draw", regex: /(draw|stalemate)/ }
-  ];
-  for (const pattern of patterns) {
-    if (pattern.regex.test(lowered)) return pattern.key;
-  }
-  return null;
-}
-
-function showEndScreen(type, message) {
-  if (!overlayRoot || !overlayBoard) return;
-  const endScreen = document.createElement("div");
-  endScreen.className = `chesscom-end-screen ${type}`;
-  endScreen.textContent = message;
-  overlayRoot.appendChild(endScreen);
-
-  endScreen.addEventListener("animationend", () => {
-    endScreen.remove();
+function updatePiecePositions(board) {
+  const pieces = board.querySelectorAll(".piece");
+  lastPiecePositions.clear();
+  
+  pieces.forEach((piece, index) => {
+    const rect = piece.getBoundingClientRect();
+    lastPiecePositions.set(index, { x: rect.left, y: rect.top });
   });
 }
 
-function observeStatus() {
-  if (!document.body) return;
-  if (statusObserver) statusObserver.disconnect();
-  statusObserver = new MutationObserver((mutations) => {
-    const text = mutations.map((m) => m.target.textContent || "").join(" ");
-    const type = detectEndState(text);
-    if (!type) return;
-    const board = getBoardElement();
-    if (!board) return;
-    ensureOverlay(board);
-    showEndScreen(type, text.trim());
+function checkForMoves(board) {
+  const pieces = board.querySelectorAll(".piece");
+  const boardRect = board.getBoundingClientRect();
+  
+  pieces.forEach((piece, index) => {
+    const rect = piece.getBoundingClientRect();
+    const lastPos = lastPiecePositions.get(index);
+    
+    if (lastPos) {
+      const dx = Math.abs(rect.left - lastPos.x);
+      const dy = Math.abs(rect.top - lastPos.y);
+      
+      // Если фигура переместилась более чем на 20px - это ход
+      if (dx > 20 || dy > 20) {
+        const x = rect.left - boardRect.left + rect.width / 2;
+        const y = rect.top - boardRect.top + rect.height / 2;
+        
+        console.log("[ChesscomSkins:Animations] Move detected at", x, y);
+        createEffectAt(x, y);
+      }
+    }
+    
+    // Обновляем позицию
+    lastPiecePositions.set(index, { x: rect.left, y: rect.top });
   });
-  statusObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
 
-function initObservers() {
-  observeBoard();
-  observeMoveList();
-  observeStatus();
-  if (!resizeBound) {
-    window.addEventListener("resize", resizeOverlay);
-    resizeBound = true;
-  }
-}
-
-function bootstrap() {
-  const board = getBoardElement();
-  if (board) {
-    ensureOverlay(board);
-    overlayOrientation = getBoardOrientation(board);
-    lastBoardSnapshot = parseBoardState();
-  }
-  initObservers();
-}
-
-function stopObservers() {
-  if (boardObserver) {
-    boardObserver.disconnect();
-    boardObserver = null;
-  }
-  if (moveListObserver) {
-    moveListObserver.disconnect();
-    moveListObserver = null;
-  }
-  if (statusObserver) {
-    statusObserver.disconnect();
-    statusObserver = null;
-  }
-  if (readyObserver) {
-    readyObserver.disconnect();
-    readyObserver = null;
-  }
-  if (overlayRoot) {
-    overlayRoot.remove();
-    overlayRoot = null;
-    overlayBoard = null;
+function triggerEffectOnElement(element, board) {
+  const rect = element.getBoundingClientRect();
+  const boardRect = board.getBoundingClientRect();
+  
+  const x = rect.left - boardRect.left + rect.width / 2;
+  const y = rect.top - boardRect.top + rect.height / 2;
+  
+  // Проверяем что это новая позиция
+  const squareKey = `${Math.round(x)}-${Math.round(y)}`;
+  if (squareKey !== lastMoveSquare) {
+    lastMoveSquare = squareKey;
+    console.log("[ChesscomSkins:Animations] Effect triggered at", x, y);
+    createEffectAt(x, y);
   }
 }
 
-chrome.storage.sync.get(["enabled", "cracksEnabled", "enabledFeatures"], (data) => {
-  overlaysEnabled = !!data.enabled;
-  const hasCracksKey = Object.prototype.hasOwnProperty.call(data, "cracksEnabled");
-  cracksEnabled = hasCracksKey ? !!data.cracksEnabled : false; // безопасный дефолт: OFF
-  particlesEnabled = !!data.enabledFeatures?.particles;
-  if (!hasCracksKey) {
-    chrome.storage.sync.set({ cracksEnabled });
+function stopMoveObserver() {
+  if (moveObserver) {
+    moveObserver.disconnect();
+    moveObserver = null;
+    console.log("[ChesscomSkins:Animations] Move observer stopped");
   }
-  if (document.readyState === "complete") {
-    if (overlaysEnabled && cracksEnabled) bootstrap();
+}
+
+// ============================================
+// Очистка
+// ============================================
+
+function cleanup() {
+  stopMoveObserver();
+  
+  if (animationFrame) {
+    cancelAnimationFrame(animationFrame);
+    animationFrame = null;
   }
-});
+  
+  if (animationCanvas) {
+    animationCanvas.remove();
+    animationCanvas = null;
+    animationCtx = null;
+  }
+  
+  particles = [];
+  cracks = [];
+}
+
+// ============================================
+// Включение/выключение эффектов
+// ============================================
+
+function updateEffectsState() {
+  if (cracksEnabled || particlesEnabled) {
+    createCanvas();
+    startMoveObserver();
+  } else {
+    cleanup();
+  }
+}
+
+// ============================================
+// Инициализация
+// ============================================
+
+function initialize() {
+  chrome.storage.sync.get(["cracksEnabled", "particlesEnabled", "enabled"], (data) => {
+    console.log("[ChesscomSkins:Animations] Storage:", data);
+    
+    // Проверяем общее включение
+    if (!data.enabled) {
+      cleanup();
+      return;
+    }
+    
+    cracksEnabled = !!data.cracksEnabled;
+    particlesEnabled = !!data.particlesEnabled;
+    
+    updateEffectsState();
+  });
+}
+
+// ============================================
+// Слушатель storage
+// ============================================
 
 chrome.storage.onChanged.addListener((changes) => {
+  console.log("[ChesscomSkins:Animations] Storage changed:", changes);
+  
   if (changes.enabled) {
-    overlaysEnabled = !!changes.enabled.newValue;
-    if (overlaysEnabled && cracksEnabled) {
-      bootstrap();
-    } else {
-      stopObservers();
+    if (!changes.enabled.newValue) {
+      cleanup();
+      cracksEnabled = false;
+      particlesEnabled = false;
+      return;
     }
   }
-  if (changes.cracksEnabled) {
+  
+  if (changes.cracksEnabled !== undefined) {
     cracksEnabled = !!changes.cracksEnabled.newValue;
-    if (cracksEnabled && overlaysEnabled) {
-      bootstrap();
-    } else if (!cracksEnabled) {
-      stopObservers();
-    }
   }
-
-  if (changes.enabledFeatures) {
-    particlesEnabled = !!changes.enabledFeatures.newValue?.particles;
+  
+  if (changes.particlesEnabled !== undefined) {
+    particlesEnabled = !!changes.particlesEnabled.newValue;
   }
+  
+  updateEffectsState();
 });
 
-let readyObserver = null;
+// ============================================
+// Запуск
+// ============================================
 
-// Инициализируем наблюдатель только когда document.body готов
-function initReadyObserver() {
-  if (readyObserver || !document.body) return;
-  
-  readyObserver = new MutationObserver(() => {
-    const board = getBoardElement();
-    if (board && overlaysEnabled && overlayBoard !== board) {
-      bootstrap();
-    }
+// Ждём загрузки страницы
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(initialize, 1000); // Даём chess.com время создать доску
   });
-  
-  readyObserver.observe(document.body, { childList: true, subtree: true });
+} else {
+  setTimeout(initialize, 1000);
 }
 
-// Запуск инициализации
-// Дождёмся ПОЛНОЙ загрузки страницы перед запуском наблюдателей
-window.addEventListener("load", () => {
-  // Всё инициализируем только ПОСЛЕ полной загрузки
-  if (overlaysEnabled) {
-    bootstrap();
-  }
-  initReadyObserver();
-});
+console.log("[ChesscomSkins:Animations] Script loaded");

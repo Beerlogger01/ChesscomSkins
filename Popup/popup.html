@@ -18,38 +18,29 @@
 
   <div class="preview-window">
     <div id="skins-container"></div>
-      <div class="preview light effect-preview-tile" data-label="Glow Effects">
-        <div class="effect-king preview-ember" data-effect="native-ember" data-label="Ember Glow">
-          <img src="../assets/Set2/wk.png" class="effect-preview" />
-        </div>
-        <div class="effect-king preview-frost" data-effect="native-frost" data-label="Frost Aura">
-          <img src="../assets/Set2/wk.png" class="effect-preview" />
-        </div>
-        <div class="effect-king preview-neon" data-effect="native-neon" data-label="Neon Pulse">
-          <img src="../assets/Set2/wk.png" class="effect-preview" />
-        </div>
-        <div class="effect-king preview-legendary" data-effect="legendary-ember" data-label="Legendary Ember">
-          <img src="../assets/Set2/wk.png" class="effect-preview" />
-        </div>
-        <div class="effect-king preview-minimal" data-effect="minimal" data-label="Minimal Halo">
-          <img src="../assets/Set2/wk.png" class="effect-preview" />
-        </div>
+    <div class="preview light effect-preview-tile" data-label="Glow Effects">
+      <div class="effect-king preview-ember" data-effect="native-ember" data-label="Ember Glow">
+        <img src="../assets/Set2/wk.png" class="effect-preview" />
       </div>
-    </div>
-  </div>
-
-  <div class="target-toggle">
-    <span>Glow target</span>
-    <div class="target-buttons">
-      <button type="button" class="target-button" data-target="all">All pieces</button>
-      <button type="button" class="target-button" data-target="royal">King + Queen</button>
+      <div class="effect-king preview-frost" data-effect="native-frost" data-label="Frost Aura">
+        <img src="../assets/Set2/wk.png" class="effect-preview" />
+      </div>
+      <div class="effect-king preview-neon" data-effect="native-neon" data-label="Neon Pulse">
+        <img src="../assets/Set2/wk.png" class="effect-preview" />
+      </div>
+      <div class="effect-king preview-legendary" data-effect="legendary-ember" data-label="Legendary Ember">
+        <img src="../assets/Set2/wk.png" class="effect-preview" />
+      </div>
+      <div class="effect-king preview-minimal" data-effect="minimal" data-label="Minimal Halo">
+        <img src="../assets/Set2/wk.png" class="effect-preview" />
+      </div>
     </div>
   </div>
 
   <div class="glow-intensity-control disabled">
     <span>Glow Intensity</span>
     <div class="slider-container">
-      <input type="range" id="glow-intensity" min="0.1" max="1" step="0.1" value="1" class="slider-input">
+      <input type="range" id="glow-intensity" min="0.1" max="1.5" step="0.1" value="1" class="slider-input">
       <span class="intensity-value">100%</span>
     </div>
   </div>
@@ -65,25 +56,23 @@
     </div>
   </div>
 
-  <div class="features-toggle disabled">
-    <span>Features</span>
-    <div class="feature-buttons">
-      <button type="button" class="feature-button" data-feature="animation" title="Piece breathing animation">Animation</button>
-      <button type="button" class="feature-button" data-feature="particles" title="Particles on moves">Particles</button>
-      <button type="button" class="feature-button" data-feature="tournament" title="Random skin each game">Tournament</button>
+  <!-- Объединённый блок анимаций (частицы + трещины) -->
+  <div class="animations-control disabled">
+    <span>Visual Effects</span>
+    <div class="animation-buttons">
+      <button type="button" class="animation-button" data-anim="particles" title="Particle effects on moves">Particles</button>
+      <button type="button" class="animation-button" data-anim="cracks" title="Crack effects on capture">Cracks</button>
+      <button type="button" class="animation-button" data-anim="animation" title="Smooth piece animations">Animations</button>
     </div>
   </div>
 
-  <div class="cracks-toggle disabled">
-    <span>Crack effect</span>
-    <button type="button" class="cracks-button">Enable cracks</button>
-  </div>
-
-  <div class="import-export-section disabled">
-    <span>Skin Import/Export</span>
-    <div class="import-export-buttons">
-      <button type="button" class="import-button">Import Skin (ZIP)</button>
-      <button type="button" class="export-button" disabled>Export Current</button>
+  <!-- Отдельный блок для турнира и импорта/экспорта -->
+  <div class="extras-control disabled">
+    <span>Extras</span>
+    <div class="extras-buttons">
+      <button type="button" class="extras-button" data-extra="tournament" title="Random skin each game">Tournament Mode</button>
+      <button type="button" class="extras-button import-btn" title="Import skin from ZIP">Import Skin</button>
+      <button type="button" class="extras-button export-btn" title="Export current skin" disabled>Export Skin</button>
     </div>
   </div>
 

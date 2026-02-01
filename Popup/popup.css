@@ -496,3 +496,102 @@ input:checked + .slider:before {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ========== Анимации (частицы + трещины) ========== */
+.animations-control {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: #202020;
+  transition: opacity 0.2s;
+}
+
+.animations-control.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.animation-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.animation-button {
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.animation-button:hover {
+  background: #f5f5f5;
+}
+
+.animation-button.active {
+  background: #7c152d;
+  color: #f1d1c8;
+  border-color: #5a0f1f;
+  box-shadow: 0 0 8px rgba(124,21,45,0.3);
+}
+
+/* ========== Extras (турнамент + импорт/экспорт) ========== */
+.extras-control {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: #202020;
+  transition: opacity 0.2s;
+}
+
+.extras-control.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.extras-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.extras-button {
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.extras-button:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.extras-button.active {
+  background: #7c152d;
+  color: #f1d1c8;
+  border-color: #5a0f1f;
+  box-shadow: 0 0 8px rgba(124,21,45,0.3);
+}
+
+.extras-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

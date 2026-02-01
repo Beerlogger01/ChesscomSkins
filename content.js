@@ -1,824 +1,474 @@
-const PIECES = [
-  "wk","wq","wr","wb","wn","wp",
-  "bk","bq","br","bb","bn","bp"
-];
+// ============================================
+// ChesscomSkins - Content Script (Main)
+// Простая и надёжная реализация
+// ============================================
 
-let SKIN_DEFINITIONS = {
-  "none": {
-    type: "none"
-  }
-};
+const PIECES = ["wk","wq","wr","wb","wn","wp","bk","bq","br","bb","bn","bp"];
 
+// Состояние
+let skinsEnabled = false;
+let currentSkin = null;
+let currentEffect = null;
+let currentBoardStyle = null;
+let glowIntensity = 1.0;
+let animationsEnabled = false;
+
+// DOM элементы для стилей
+let skinStyleTag = null;
+let effectStyleTag = null;
+let boardStyleTag = null;
+let animationStyleTag = null;
+
+// Конфиги
+let SKINS = {};
 let BOARD_STYLES = {};
 
-// Переменные для новых функций
-let glowIntensity = 1;
-let boardStyleTag = null;
-let particleStyleTag = null;
-let animationStyleTag = null;
-let tournamentMode = false;
-let currentTournamentSkin = null;
-let tournamentListenerAttached = false;
-let effectsEnabled = false;
+// ============================================
+// Загрузка конфигов
+// ============================================
 
-// Загрузка доступных скинов из конфига
-async function loadSkinsConfig() {
+async function loadConfigs() {
   try {
-    const url = chrome.runtime.getURL("assets/skins.json");
-    const response = await fetch(url);
-    const config = await response.json();
+    // Загружаем скины
+    const skinsUrl = chrome.runtime.getURL("assets/skins.json");
+    const skinsResp = await fetch(skinsUrl);
+    const skinsData = await skinsResp.json();
     
-    if (config.skins && Array.isArray(config.skins)) {
-      config.skins.forEach(skin => {
-        SKIN_DEFINITIONS[skin.id] = {
-          type: "image",
-          path: `assets/${skin.folder}`,
+    if (skinsData.skins) {
+      skinsData.skins.forEach(skin => {
+        SKINS[skin.id] = {
           name: skin.name,
-          description: skin.description
+          folder: skin.folder,
+          path: `assets/${skin.folder}`
         };
       });
     }
-  } catch (error) {
-    console.warn("[ChesscomSkins] Не удалось загрузить конфиг скинов:", error);
-  }
-}
-
-// Загрузка конфига (доска и стили)
-async function loadFullConfig() {
-  try {
-    const url = chrome.runtime.getURL("assets/config.json");
-    const response = await fetch(url);
-    const config = await response.json();
     
-    if (config.boardStyles && Array.isArray(config.boardStyles)) {
-      config.boardStyles.forEach(style => {
+    // Загружаем стили доски
+    const configUrl = chrome.runtime.getURL("assets/config.json");
+    const configResp = await fetch(configUrl);
+    const configData = await configResp.json();
+    
+    if (configData.boardStyles) {
+      configData.boardStyles.forEach(style => {
         BOARD_STYLES[style.id] = style;
       });
     }
-  } catch (error) {
-    console.warn("[ChesscomSkins] Не удалось загрузить полный конфиг:", error);
+    
+    console.log("[ChesscomSkins] Configs loaded:", Object.keys(SKINS), Object.keys(BOARD_STYLES));
+  } catch (e) {
+    console.error("[ChesscomSkins] Failed to load configs:", e);
   }
 }
 
-// Инициализация конфигов при загрузке
-const configReady = Promise.all([loadSkinsConfig(), loadFullConfig()]);
+// ============================================
+// Применение скина фигур
+// ============================================
 
-const EFFECT_DEFINITIONS = {
-  "minimal": {
-    type: "filter",
-    filter: "saturate(1.02)",
-    ringColor: "rgba(255,255,255,0.8)",
-    ringOpacity: 0.65,
-    ringBorder: "2px",
-    ringInset: "14%",
-    ringAnimation: "ringSoft 1.8s ease-in-out infinite",
-    ringGlow: "0 0 8px rgba(255,255,255,0.35)"
-  },
-  "native-ember": {
-    type: "filter",
-    filter: "hue-rotate(-12deg) saturate(1.2) brightness(1.02)",
-    ringColor: "rgba(255,120,60,0.75)"
-  },
-  "native-frost": {
-    type: "filter",
-    filter: "hue-rotate(185deg) saturate(1.2) brightness(1.05)",
-    ringColor: "rgba(110,190,255,0.75)"
-  },
-  "native-neon": {
-    type: "filter",
-    filter: "hue-rotate(270deg) saturate(1.3) brightness(1.05)",
-    ringColor: "rgba(210,120,255,0.75)"
-  },
-  "none": {
-    type: "none"
+function applySkin(skinId) {
+  // Удаляем старый стиль
+  if (skinStyleTag) {
+    skinStyleTag.remove();
+    skinStyleTag = null;
   }
-};
-
-let skinStyleTag = null;
-let effectStyleTag = null;
-let lastAppliedSkin = null;
-let lastAppliedEffect = null;
-let lastAppliedTarget = null;
-let overlayStyleTag = null;
-let skinsEnabled = false;
-let activeSkinPath = null;
-let capturedObserver = null;
-
-function applySkin(skinName, skinPath) {
-  if (lastAppliedSkin === skinName && activeSkinPath === skinPath) return;
-  lastAppliedSkin = skinName;
-
-  if (skinStyleTag) skinStyleTag.remove();
-  if (!skinName || skinName === "none") {
-    activeSkinPath = null;
+  
+  currentSkin = skinId;
+  
+  if (!skinId || skinId === "none" || !SKINS[skinId]) {
+    console.log("[ChesscomSkins] Skin disabled");
     return;
   }
-
-  skinStyleTag = document.createElement("style");
-  const definition = SKIN_DEFINITIONS[skinName];
-  if ((!definition || definition.type === "none") && !skinPath) return;
-
+  
+  const skin = SKINS[skinId];
+  const basePath = skin.path;
+  
   let css = "";
-  const resolvedPath = skinPath || definition.path;
-  if (resolvedPath) {
-    activeSkinPath = resolvedPath;
-    PIECES.forEach(piece => {
-      const url = chrome.runtime.getURL(`${resolvedPath}/${piece}.png`);
-      css += `
-        .piece.${piece},
-        .promotion-piece.${piece},
-        .captured-pieces .piece.${piece},
-        .captured-piece.${piece},
-        .captured-piece .piece.${piece},
-        .captured .piece.${piece},
-        [class*="captured"] .piece.${piece},
-        .captured-pieces [data-piece="${piece}"],
-        .captured-pieces [class*="piece"][data-piece="${piece}"],
-        [class*="captured"] [data-piece="${piece}"],
-        .captured-piece[data-piece="${piece}"] {
-          background-image: url("${url}") !important;
-          background-size: contain !important;
-          background-repeat: no-repeat !important;
-          background-position: center !important;
-        }
-      `;
-    });
-  }
-
-  skinStyleTag.textContent = css;
-  document.head.appendChild(skinStyleTag);
-  updateCapturedImages();
-  ensureCapturedObserver();
-}
-
-function ensureCapturedObserver() {
-  if (capturedObserver) return;
-  
-  let updateScheduled = false;
-  const debouncedUpdate = () => {
-    if (updateScheduled) return;
-    updateScheduled = true;
-    requestAnimationFrame(() => {
-      updateCapturedImages();
-      updateScheduled = false;
-    });
-  };
-  
-  capturedObserver = new MutationObserver(debouncedUpdate);
-  const targets = document.querySelectorAll('.captured-pieces, [class*="captured"], .board');
-  if (targets.length) {
-    targets.forEach((node) => capturedObserver.observe(node, { childList: true, subtree: true }));
-  } else {
-    capturedObserver.observe(document.body, { childList: true, subtree: true });
-  }
-}
-
-function updateCapturedImages() {
-  if (!activeSkinPath) return;
-  const elements = document.querySelectorAll(
-    ".captured-pieces [data-piece], [class*=\"captured\"] [data-piece], .captured-pieces .piece, [class*=\"captured\"] .piece"
-  );
-  elements.forEach((el) => {
-    let piece = el.dataset?.piece;
-    if (!piece) {
-      const classMatch = PIECES.find((code) => el.classList.contains(code));
-      piece = classMatch || null;
-    }
-    if (!piece) return;
-    const url = chrome.runtime.getURL(`${activeSkinPath}/${piece}.png`);
-    if (el.tagName === "IMG") {
-      if (el.src !== url) el.src = url;
-    } else {
-      el.style.backgroundImage = `url("${url}")`;
-      el.style.backgroundSize = "contain";
-      el.style.backgroundRepeat = "no-repeat";
-      el.style.backgroundPosition = "center";
-    }
-  });
-}
-
-function applyEffect(effectName, targetName) {
-  if (lastAppliedEffect === effectName && lastAppliedTarget === targetName) return;
-  // если эффекты временно отключены (оптимизация), не применять
-  if (!effectsEnabled && effectName !== "none") return;
-  lastAppliedEffect = effectName;
-  lastAppliedTarget = targetName;
-
-  if (effectStyleTag) effectStyleTag.remove();
-  if (!effectName || effectName === "none") return;
-
-  effectStyleTag = document.createElement("style");
-  const definition = EFFECT_DEFINITIONS[effectName];
-  if (!definition || definition.type === "none") return;
-
-  const ringAnimation = definition.ringAnimation || "ringPulse 1.2s ease-in-out infinite";
-
-  const glowTargets = targetName === "royal"
-    ? [".piece.wk", ".piece.wq", ".piece.bk", ".piece.bq"]
-    : [".piece", ".promotion-piece"];
-  
-  // Оптимизация: используем более специфичные селекторы для основных состояний
-  const glowTargetSelector = glowTargets.join(", ");
-  const glowTargetActive = glowTargets.map((target) => `${target}.selected, .selected ${target}, ${target}.last-move, .last-move ${target}, ${target}.move, .move ${target}`).join(", ");
-  const glowTargetCheck = glowTargets.map((target) => `${target}.check, .check ${target}`).join(", ");
-  const glowTargetCheckmate = glowTargets.map((target) => `${target}.checkmate, .checkmate ${target}, ${target}.mate, .mate ${target}`).join(", ");
-  const glowTargetCapture = glowTargets.map((target) => `${target}.capture, .capture ${target}`).join(", ");
-
-  let css = `
-    ${glowTargetSelector} {
-      position: relative;
-      contain: paint;
-      transform: translateZ(0);
-      --glow-intensity: ${glowIntensity};
-      filter: var(--piece-filter, none);
-      transition: filter 0.2s ease;
-    }
-
-    /* Отключаем эффекты для захватанных фигур */
-    .captured .piece,
-    .captured-piece,
-    .captured-pieces .piece,
-    [class*="captured"] .piece {
-      animation: none !important;
-      filter: var(--piece-filter, none) !important;
-    }
-
-    /* Оптимизированные анимации с учётом интенсивности */
-    @keyframes glowPulse {
-      0% {
-        text-shadow: 0 0 4px var(--ring-color, rgba(255,120,60,0.85)),
-                     0 0 8px var(--ring-color, rgba(255,120,60,0.5));
-        filter: var(--piece-filter, none) drop-shadow(0 0 3px var(--ring-color, rgba(255,120,60,${0.6 * glowIntensity})));
-      }
-      50% {
-        text-shadow: 0 0 10px var(--ring-color, rgba(255,120,60,0.95)),
-                     0 0 16px var(--ring-color, rgba(255,120,60,0.7));
-        filter: var(--piece-filter, none) drop-shadow(0 0 6px var(--ring-color, rgba(255,120,60,0.85)));
-      }
-      100% {
-        text-shadow: 0 0 4px var(--ring-color, rgba(255,120,60,0.85)),
-                     0 0 8px var(--ring-color, rgba(255,120,60,0.5));
-        filter: var(--piece-filter, none) drop-shadow(0 0 3px var(--ring-color, rgba(255,120,60,0.6)));
-      }
-    }
-
-    @keyframes glowShimmer {
-      0%, 100% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 3px var(--ring-color, rgba(255,120,60,0.5)));
-      }
-      50% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 8px var(--ring-color, rgba(255,120,60,0.9)));
-      }
-    }
-
-    @keyframes ringPulse {
-      0%, 100% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 3px var(--ring-color, rgba(255,120,60,0.6)));
-      }
-      50% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 8px var(--ring-color, rgba(255,120,60,0.85)));
-      }
-    }
-
-    @keyframes ringSoft {
-      0%, 100% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 2px var(--ring-color, rgba(255,255,255,0.5)));
-      }
-      50% {
-        filter: var(--piece-filter, none) drop-shadow(0 0 5px var(--ring-color, rgba(255,255,255,0.8)));
-      }
-    }
-
-    @keyframes fireworks {
-      0%, 100% {
-        transform: scale(1) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 4px rgba(255,210,80,0.5));
-      }
-      50% {
-        transform: scale(1.05) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 10px rgba(255,210,80,0.85));
-      }
-    }
-
-    @keyframes checkPulse {
-      0%, 100% {
-        transform: scale(1) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 4px rgba(255,70,70,0.6));
-      }
-      50% {
-        transform: scale(1.06) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 10px rgba(255,70,70,0.9));
-      }
-    }
-
-    @keyframes mateFlare {
-      0%, 100% {
-        transform: scale(1) rotate(0deg) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 5px rgba(255,200,60,0.7));
-      }
-      50% {
-        transform: scale(1.1) rotate(3deg) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 12px rgba(255,200,60,0.95));
-      }
-    }
-
-    @keyframes captureBurst {
-      0% {
-        transform: scale(0.8) translateZ(0);
-        opacity: 0;
-        filter: var(--piece-filter, none) drop-shadow(0 0 2px rgba(255,120,60,0.5));
-      }
-      50% {
-        transform: scale(1.02) translateZ(0);
-        opacity: 1;
-        filter: var(--piece-filter, none) drop-shadow(0 0 12px rgba(255,120,60,0.85));
-      }
-      100% {
-        transform: scale(1.15) translateZ(0);
-        opacity: 0;
-        filter: var(--piece-filter, none) drop-shadow(0 0 1px rgba(255,120,60,0));
-      }
-    }
-
-    @keyframes queenCapture {
-      0%, 100% {
-        transform: scale(1) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 3px rgba(255,190,90,0.6));
-      }
-      50% {
-        transform: scale(1.06) translateZ(0);
-        filter: var(--piece-filter, none) drop-shadow(0 0 9px rgba(255,190,90,0.9));
-      }
-    }
-
-    /* Применяем анимации только к активным фигурам */
-    ${glowTargetActive} {
-      animation: ${ringAnimation};
-      will-change: filter;
-    }
-
-    ${glowTargetCheck} {
-      animation: checkPulse 1s ease-in-out infinite;
-      will-change: filter, transform;
-      --ring-color: rgba(255,70,70,0.9);
-    }
-
-    ${glowTargetCheckmate},
-    ${glowTargets.map((target) => `${target}.mate`).join(", ")} {
-      animation: mateFlare 1.4s ease-in-out infinite;
-      will-change: filter, transform;
-      --ring-color: rgba(255,200,60,0.95);
-    }
-
-    ${glowTargetCapture} {
-      animation: captureBurst 0.7s ease-out;
-      will-change: transform, opacity;
-    }
-
-    .captured-pieces .piece.wq,
-    .captured-pieces .piece.bq {
-      animation: queenCapture 1.4s ease-in-out 1;
-      will-change: filter, transform;
-    }
-  `;
-
-  if (definition.type === "filter") {
+  PIECES.forEach(piece => {
+    const url = chrome.runtime.getURL(`${basePath}/${piece}.png`);
     css += `
-      .piece,
-      .promotion-piece {
-        --piece-filter: ${definition.filter};
-        --ring-color: ${definition.ringColor};
+      .piece.${piece} {
+        background-image: url("${url}") !important;
       }
     `;
+  });
+  
+  skinStyleTag = document.createElement("style");
+  skinStyleTag.id = "chesscom-skins-pieces";
+  skinStyleTag.textContent = css;
+  document.head.appendChild(skinStyleTag);
+  
+  console.log("[ChesscomSkins] Skin applied:", skinId);
+}
 
-    if (definition.ringColorOverrides) {
-      Object.entries(definition.ringColorOverrides).forEach(([piece, color]) => {
-        css += `
-          .piece.${piece},
-          .promotion-piece.${piece} {
-            --ring-color: ${color};
-          }
-        `;
-      });
-    }
+// ============================================
+// Применение эффекта свечения
+// ============================================
+
+function applyEffect(effectId) {
+  // Удаляем старый стиль
+  if (effectStyleTag) {
+    effectStyleTag.remove();
+    effectStyleTag = null;
   }
-
-  effectStyleTag.textContent = css;
-  document.head.appendChild(effectStyleTag);
-}
-
-function disableSkins() {
-  if (skinStyleTag) skinStyleTag.remove();
-  if (effectStyleTag) effectStyleTag.remove();
-  skinStyleTag = null;
-  effectStyleTag = null;
-  lastAppliedSkin = null;
-  lastAppliedEffect = null;
-  lastAppliedTarget = null;
-}
-
-function clampIntensity(value, fallback = 1) {
-  const numeric = Number(value);
-  if (Number.isFinite(numeric)) {
-    return Math.min(1, Math.max(0.1, numeric));
-  }
-  return fallback;
-}
-
-async function initializeFromStorage() {
-  try {
-    await configReady;
-  } catch (error) {
-    console.warn("[ChesscomSkins] Конфиги загружены с ошибками:", error);
-  }
-
-  chrome.storage.sync.get(
-    [
-      "enabled",
-      "activeSkin",
-      "activeEffect",
-      "activeTarget",
-      "activeSkinPath",
-      "activeSet",
-      "boardStyle",
-      "glowIntensity",
-      "enabledFeatures"
-    ],
-    (data) => {
-      skinsEnabled = !!data.enabled;
-      glowIntensity = clampIntensity(data.glowIntensity, glowIntensity);
-      effectsEnabled = skinsEnabled; // включаем эффекты только если включено расширение
-
-      let activeSkin = data.activeSkin;
-      let activeEffect = data.activeEffect;
-      const activeTarget = data.activeTarget || "all";
-      const skinPath = data.activeSkinPath;
-
-      if (data.activeSet && !activeSkin && !activeEffect) {
-        if (SKIN_DEFINITIONS[data.activeSet]) {
-          activeSkin = data.activeSet;
-        } else if (EFFECT_DEFINITIONS[data.activeSet]) {
-          activeEffect = data.activeSet;
-        }
-      }
-
-        if (skinsEnabled) {
-          applySkin(activeSkin || "set2", skinPath || null);
-          if (activeEffect && activeEffect !== "none") {
-            applyEffect(activeEffect, activeTarget);
-          }
-          applyBoardStyle(data.boardStyle || "default");
-
-          const features = data.enabledFeatures || {};
-          enablePieceAnimation(!!features.animation);
-          enableTournamentMode(!!features.tournament);
-        }
-    }
-  );
-}
-
-initializeFromStorage();
-
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.enabled && changes.enabled.newValue === false) {
-    skinsEnabled = false;
-    disableSkins();
+  
+  currentEffect = effectId;
+  
+  if (!effectId || effectId === "none") {
+    console.log("[ChesscomSkins] Effect disabled");
     return;
   }
-
-  if (changes.enabled && changes.enabled.newValue === true) {
-    skinsEnabled = true;
-    chrome.storage.sync.get(
-      ["activeSkin", "activeEffect", "activeTarget", "activeSkinPath", "boardStyle", "glowIntensity", "enabledFeatures"],
-      (data) => {
-      applySkin(data.activeSkin || "set2", data.activeSkinPath || null);
-      applyEffect(data.activeEffect || "native-ember", data.activeTarget || "all");
-      applyBoardStyle(data.boardStyle || "default");
-      if (data.glowIntensity) setGlowIntensity(data.glowIntensity);
-      const features = data.enabledFeatures || {};
-      enablePieceAnimation(!!features.animation);
-      enableTournamentMode(!!features.tournament);
-    });
+  
+  // Определяем параметры эффекта
+  const effects = {
+    "native-ember": {
+      filter: "hue-rotate(-12deg) saturate(1.2) brightness(1.02)",
+      glowColor: "rgba(255, 120, 60, 0.8)",
+      glowSize: 8
+    },
+    "native-frost": {
+      filter: "hue-rotate(185deg) saturate(1.2) brightness(1.05)",
+      glowColor: "rgba(110, 190, 255, 0.8)",
+      glowSize: 8
+    },
+    "native-neon": {
+      filter: "hue-rotate(270deg) saturate(1.3) brightness(1.05)",
+      glowColor: "rgba(210, 120, 255, 0.8)",
+      glowSize: 10
+    },
+    "legendary-ember": {
+      filter: "saturate(1.3) brightness(1.08)",
+      glowColor: "rgba(255, 180, 60, 0.9)",
+      glowSize: 12
+    },
+    "minimal": {
+      filter: "saturate(1.02) brightness(1.01)",
+      glowColor: "rgba(255, 255, 255, 0.6)",
+      glowSize: 4
+    }
+  };
+  
+  const effect = effects[effectId];
+  if (!effect) {
+    console.log("[ChesscomSkins] Unknown effect:", effectId);
     return;
   }
-
-  if (!skinsEnabled) return;
-
-  if (changes.activeSkin && changes.activeSkin.newValue) {
-    chrome.storage.sync.get("activeSkinPath", (stored) => {
-      applySkin(changes.activeSkin.newValue, stored.activeSkinPath || null);
-    });
-  }
-
-  if (changes.activeEffect && changes.activeEffect.newValue) {
-    chrome.storage.sync.get("activeTarget", (stored) => {
-      applyEffect(changes.activeEffect.newValue, stored.activeTarget || "all");
-    });
-  }
-
-  if (changes.activeSkinPath && changes.activeSkinPath.newValue) {
-    chrome.storage.sync.get("activeSkin", (data) => {
-      applySkin(data.activeSkin || "set2", changes.activeSkinPath.newValue || null);
-    });
-  }
-
-  if (changes.activeTarget && changes.activeTarget.newValue) {
-    chrome.storage.sync.get("activeEffect", (stored) => {
-      applyEffect(stored.activeEffect || "native-ember", changes.activeTarget.newValue);
-    });
-  }
-
-});
-
-let lastOverlayAt = 0;
-let hasShownGoodLuck = false;
-let goodLuckObserver = null;
-
-function ensureOverlayStyles() {
-  if (overlayStyleTag) return;
-  overlayStyleTag = document.createElement("style");
-  overlayStyleTag.textContent = `
-    .good-luck-overlay {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      pointer-events: none;
-      font-family: "Inter", sans-serif;
-      font-size: clamp(32px, 6vw, 72px);
-      font-weight: 700;
-      color: rgba(255, 240, 210, 0.95);
-      text-shadow: 0 0 20px rgba(255, 170, 80, 0.85);
-      animation: goodLuckFade 3.2s ease-out forwards;
-      background: radial-gradient(circle, rgba(20,10,0,0.35) 0%, rgba(0,0,0,0) 70%);
+  
+  // Вычисляем размер свечения с учётом интенсивности
+  const actualGlowSize = Math.round(effect.glowSize * glowIntensity);
+  
+  const css = `
+    .piece {
+      filter: ${effect.filter} drop-shadow(0 0 ${actualGlowSize}px ${effect.glowColor}) !important;
+      transition: filter 0.2s ease;
     }
-
-    @keyframes goodLuckFade {
-      0% { opacity: 0; transform: translateY(20px) scale(0.98); }
-      20% { opacity: 1; transform: translateY(0) scale(1); }
-      70% { opacity: 1; }
-      100% { opacity: 0; transform: translateY(-10px) scale(1.02); }
+    
+    /* Убираем эффекты для захваченных фигур */
+    .captured-pieces .piece,
+    [class*="captured"] .piece {
+      filter: none !important;
     }
   `;
-  document.head.appendChild(overlayStyleTag);
+  
+  effectStyleTag = document.createElement("style");
+  effectStyleTag.id = "chesscom-skins-effect";
+  effectStyleTag.textContent = css;
+  document.head.appendChild(effectStyleTag);
+  
+  console.log("[ChesscomSkins] Effect applied:", effectId, "intensity:", glowIntensity);
 }
 
-function showGoodLuckOverlay() {
-  if (!skinsEnabled) return;
-  if (hasShownGoodLuck) return;
-  const now = Date.now();
-  if (now - lastOverlayAt < 5000) return;
-  lastOverlayAt = now;
-  ensureOverlayStyles();
-
-  const overlay = document.createElement("div");
-  overlay.className = "good-luck-overlay";
-  overlay.textContent = "Good luck";
-  document.body.appendChild(overlay);
-  setTimeout(() => overlay.remove(), 3400);
-  hasShownGoodLuck = true;
-  if (goodLuckObserver) {
-    goodLuckObserver.disconnect();
-    goodLuckObserver = null;
-  }
-}
-
-function watchForGameStart() {
-  if (window.location.pathname.includes("/analysis")) return;
-  const maybeShow = () => {
-    const board = document.querySelector(".board, .board-area, .board-container, chess-board");
-    if (board) showGoodLuckOverlay();
-  };
-
-  maybeShow();
-  if (!goodLuckObserver) {
-    goodLuckObserver = new MutationObserver(() => maybeShow());
-    goodLuckObserver.observe(document.body, { childList: true, subtree: true });
-  }
-}
-
-// ========== НОВЫЕ ФУНКЦИИ ==========
+// ============================================
+// Применение стиля доски
+// ============================================
 
 function applyBoardStyle(styleId) {
-  if (boardStyleTag) boardStyleTag.remove();
-  if (!styleId || styleId === "default" || !BOARD_STYLES[styleId]) {
-    loadDefaultBoardStyle();
+  // Удаляем старый стиль
+  if (boardStyleTag) {
+    boardStyleTag.remove();
+    boardStyleTag = null;
+  }
+  
+  currentBoardStyle = styleId;
+  
+  if (!styleId || styleId === "default") {
+    console.log("[ChesscomSkins] Board style reset to default");
     return;
   }
-
+  
   const style = BOARD_STYLES[styleId];
-  boardStyleTag = document.createElement("style");
+  if (!style) {
+    console.log("[ChesscomSkins] Unknown board style:", styleId);
+    return;
+  }
+  
+  // Chess.com использует CSS переменные и разные методы для стилизации доски
+  // Применяем через CSS переменные и прямые селекторы для wc-chess-board
   
   let css = `
-    /* Основные классы chess.com */
-    .board .light,
-    .board .light-square,
-    .board .square.light,
-    .board .square.light-square,
-    .board .board-square-light {
+    /* CSS переменные для доски */
+    wc-chess-board,
+    chess-board,
+    .board {
+      --light-color: ${style.lightColor} !important;
+      --dark-color: ${style.darkColor} !important;
+    }
+    
+    /* Прямые стили для координатной сетки (старый способ chess.com) */
+    .coordinates-light {
+      fill: ${style.darkColor} !important;
+      color: ${style.darkColor} !important;
+    }
+    .coordinates-dark {
+      fill: ${style.lightColor} !important;
+      color: ${style.lightColor} !important;
+    }
+    
+    /* Стили для SVG доски */
+    wc-chess-board .light,
+    chess-board .light,
+    .board .light {
+      fill: ${style.lightColor} !important;
+    }
+    
+    wc-chess-board .dark,
+    chess-board .dark,
+    .board .dark {
+      fill: ${style.darkColor} !important;
+    }
+    
+    /* Альтернативный способ через псевдокласс для элементов с data-square */
+    [data-square] {
+      background: none !important;
+    }
+    
+    /* Стилизация через класс чётности */
+    .board-square-light,
+    [class*="square"][class*="light"] {
       background-color: ${style.lightColor} !important;
     }
     
-    .board .dark,
-    .board .dark-square,
-    .board .square.dark,
-    .board .square.dark-square,
-    .board .board-square-dark {
+    .board-square-dark,
+    [class*="square"][class*="dark"] {
       background-color: ${style.darkColor} !important;
     }
   `;
   
-  // Для neon стиля добавляем свечение
-  if (styleId === "neon" && style.glowColor) {
+  // Для neon стиля добавляем свечение на саму доску
+  if (style.glowColor) {
     css += `
-      .board .light,
-      .board .light-square,
-      .board .square.light,
-      .board .square.light-square,
-      .board .board-square-light {
-        box-shadow: inset 0 0 10px ${style.glowColor} !important;
-      }
-      .board .dark,
-      .board .dark-square,
-      .board .square.dark,
-      .board .square.dark-square,
-      .board .board-square-dark {
-        box-shadow: inset 0 0 15px ${style.glowColor} !important;
+      wc-chess-board,
+      chess-board,
+      .board {
+        box-shadow: 0 0 30px ${style.glowColor}, inset 0 0 60px rgba(0,0,0,0.3) !important;
       }
     `;
   }
   
+  boardStyleTag = document.createElement("style");
+  boardStyleTag.id = "chesscom-skins-board";
   boardStyleTag.textContent = css;
   document.head.appendChild(boardStyleTag);
+  
+  console.log("[ChesscomSkins] Board style applied:", styleId);
 }
 
-function loadDefaultBoardStyle() {
-  if (boardStyleTag) boardStyleTag.remove();
-  boardStyleTag = document.createElement("style");
-  
-  const defaultStyle = BOARD_STYLES["default"] || {
-    lightColor: "#f0d9b5",
-    darkColor: "#b58863"
-  };
-  
-  boardStyleTag.textContent = `
-    .board .light,
-    .board .light-square,
-    .board .square.light,
-    .board .square.light-square,
-    .board .board-square-light { background-color: ${defaultStyle.lightColor} !important; }
-    .board .dark,
-    .board .dark-square,
-    .board .square.dark,
-    .board .square.dark-square,
-    .board .board-square-dark { background-color: ${defaultStyle.darkColor} !important; }
-  `;
-  document.head.appendChild(boardStyleTag);
-}
+// ============================================
+// Установка интенсивности свечения
+// ============================================
 
-// Интенсивность свечения (умножитель на opacity эффектов)
-function setGlowIntensity(intensity) {
-  glowIntensity = clampIntensity(intensity, glowIntensity);
-  if (lastAppliedEffect) {
-    applyEffect(lastAppliedEffect, lastAppliedTarget || "all");
+function setGlowIntensity(value) {
+  glowIntensity = Math.max(0.1, Math.min(1.5, parseFloat(value) || 1.0));
+  console.log("[ChesscomSkins] Glow intensity set to:", glowIntensity);
+  
+  // Перепрменяем эффект с новой интенсивностью
+  if (currentEffect && currentEffect !== "none") {
+    applyEffect(currentEffect);
   }
 }
 
-// Анимации фигур (дыхание)
-function enablePieceAnimation(enabled) {
-  if (animationStyleTag) animationStyleTag.remove();
-  if (!enabled) return;
+// ============================================
+// Анимации (визуальные эффекты при ходах)
+// ============================================
+
+function enableAnimations(enabled) {
+  animationsEnabled = enabled;
   
+  if (animationStyleTag) {
+    animationStyleTag.remove();
+    animationStyleTag = null;
+  }
+  
+  if (!enabled) {
+    console.log("[ChesscomSkins] Animations disabled");
+    return;
+  }
+  
+  // Добавляем CSS для анимаций
   animationStyleTag = document.createElement("style");
+  animationStyleTag.id = "chesscom-skins-animations";
   animationStyleTag.textContent = `
-    .piece, .promotion-piece {
-      animation: pieceBreathe 3s ease-in-out infinite;
+    /* Эффект при перемещении фигуры */
+    .piece {
+      transition: transform 0.15s ease-out, filter 0.2s ease !important;
     }
     
-    @keyframes pieceBreathe {
-      0%, 100% {
-        transform: scale(1) translateZ(0);
-      }
-      50% {
-        transform: scale(1.02) translateZ(0);
-      }
+    /* Подсветка последнего хода */
+    .highlight {
+      animation: highlightPulse 0.5s ease-out;
+    }
+    
+    @keyframes highlightPulse {
+      0% { box-shadow: inset 0 0 20px rgba(255, 200, 100, 0.8); }
+      100% { box-shadow: none; }
     }
   `;
   document.head.appendChild(animationStyleTag);
+  
+  console.log("[ChesscomSkins] Animations enabled");
 }
 
-// Оптимизированные частицы при ходах
-function spawnParticles(x, y, type = "normal") {
-  const container = document.querySelector(".chesscom-skins-overlay") || overlayRoot;
-  if (!container) return;
-  
-  const particleCount = type === "capture" ? 8 : 4;
-  
-  for (let i = 0; i < particleCount; i++) {
-    const particle = document.createElement("div");
-    particle.className = "particle";
-    particle.style.left = x + "px";
-    particle.style.top = y + "px";
-    
-    const angle = (Math.PI * 2 * i) / particleCount;
-    const velocity = 2 + Math.random() * 3;
-    const vx = Math.cos(angle) * velocity;
-    const vy = Math.sin(angle) * velocity;
-    
-    particle.style.setProperty("--vx", vx);
-    particle.style.setProperty("--vy", vy);
-    
-    const duration = 600 + Math.random() * 400;
-    particle.style.animation = `particleFloat ${duration}ms ease-out forwards`;
-    
-    container.appendChild(particle);
-    
-    setTimeout(() => particle.remove(), duration);
+// ============================================
+// Отключение всего
+// ============================================
+
+function disableAll() {
+  if (skinStyleTag) {
+    skinStyleTag.remove();
+    skinStyleTag = null;
   }
+  if (effectStyleTag) {
+    effectStyleTag.remove();
+    effectStyleTag = null;
+  }
+  if (boardStyleTag) {
+    boardStyleTag.remove();
+    boardStyleTag = null;
+  }
+  if (animationStyleTag) {
+    animationStyleTag.remove();
+    animationStyleTag = null;
+  }
+  
+  currentSkin = null;
+  currentEffect = null;
+  currentBoardStyle = null;
+  skinsEnabled = false;
+  animationsEnabled = false;
+  
+  console.log("[ChesscomSkins] All disabled");
 }
 
-// Режим турнамента (случайный скин каждую новую игру)
-function enableTournamentMode(enabled) {
-  tournamentMode = enabled;
-  if (enabled) {
-    selectRandomSkin();
-    if (!tournamentListenerAttached) {
-      window.addEventListener("beforeunload", selectRandomSkin);
-      tournamentListenerAttached = true;
+// ============================================
+// Инициализация из storage
+// ============================================
+
+async function initialize() {
+  await loadConfigs();
+  
+  chrome.storage.sync.get([
+    "enabled",
+    "activeSkin",
+    "activeEffect",
+    "boardStyle",
+    "glowIntensity",
+    "animationsEnabled"
+  ], (data) => {
+    console.log("[ChesscomSkins] Storage data:", data);
+    
+    skinsEnabled = !!data.enabled;
+    glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+    
+    if (skinsEnabled) {
+      if (data.activeSkin && data.activeSkin !== "none") {
+        applySkin(data.activeSkin);
+      }
+      if (data.activeEffect && data.activeEffect !== "none") {
+        applyEffect(data.activeEffect);
+      }
+      if (data.boardStyle && data.boardStyle !== "default") {
+        applyBoardStyle(data.boardStyle);
+      }
+      if (data.animationsEnabled) {
+        enableAnimations(true);
+      }
     }
-  } else if (tournamentListenerAttached) {
-    window.removeEventListener("beforeunload", selectRandomSkin);
-    tournamentListenerAttached = false;
-  }
-}
-
-function selectRandomSkin() {
-  const skins = Object.keys(SKIN_DEFINITIONS).filter(id => id !== "none");
-  if (skins.length === 0) return;
-  
-  const randomSkin = skins[Math.floor(Math.random() * skins.length)];
-  currentTournamentSkin = randomSkin;
-  
-  chrome.storage.sync.set({
-    activeSkin: randomSkin,
-    activeSet: randomSkin
   });
-  
-  console.log("[ChesscomSkins Tournament] Selected: " + randomSkin);
 }
 
-// Добавляем слушатель на новые игры в режиме турнамента
-if (tournamentMode) {
-  window.addEventListener("beforeunload", () => {
-    if (tournamentMode) {
-      selectRandomSkin();
-    }
-  });
-}
-
-// ========== ОБРАБОТЧИК СООБЩЕНИЙ ОТ POPUP ==========
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "setGlowIntensity") {
-    setGlowIntensity(request.intensity);
-    sendResponse({success: true});
-  } else if (request.action === "setBoardStyle") {
-    applyBoardStyle(request.style);
-    sendResponse({success: true});
-  } else if (request.action === "setFeature") {
-    const feature = request.feature;
-    const enabled = request.enabled;
-    
-    if (feature === "animation") {
-      enablePieceAnimation(enabled);
-    } else if (feature === "particles") {
-      // Частицы уже применяются автоматически в spawnCrackEffect
-    } else if (feature === "tournament") {
-      enableTournamentMode(enabled);
-    }
-    sendResponse({success: true});
-  }
-});
+// ============================================
+// Слушатель изменений storage
+// ============================================
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.boardStyle && changes.boardStyle.newValue) {
+  console.log("[ChesscomSkins] Storage changed:", changes);
+  
+  // Включение/выключение
+  if (changes.enabled) {
+    skinsEnabled = !!changes.enabled.newValue;
+    if (!skinsEnabled) {
+      disableAll();
+    } else {
+      // При включении применяем сохранённые настройки
+      chrome.storage.sync.get(["activeSkin", "activeEffect", "boardStyle", "glowIntensity", "animationsEnabled"], (data) => {
+        glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+        if (data.activeSkin) applySkin(data.activeSkin);
+        if (data.activeEffect) applyEffect(data.activeEffect);
+        if (data.boardStyle) applyBoardStyle(data.boardStyle);
+        if (data.animationsEnabled) enableAnimations(true);
+      });
+    }
+    return;
+  }
+  
+  if (!skinsEnabled) return;
+  
+  // Изменение скина
+  if (changes.activeSkin) {
+    applySkin(changes.activeSkin.newValue);
+  }
+  
+  // Изменение эффекта
+  if (changes.activeEffect) {
+    applyEffect(changes.activeEffect.newValue);
+  }
+  
+  // Изменение стиля доски
+  if (changes.boardStyle) {
     applyBoardStyle(changes.boardStyle.newValue);
   }
-
+  
+  // Изменение интенсивности
   if (changes.glowIntensity) {
     setGlowIntensity(changes.glowIntensity.newValue);
   }
-
-  if (changes.enabledFeatures) {
-    const features = changes.enabledFeatures.newValue || {};
-    enablePieceAnimation(!!features.animation);
-    enableTournamentMode(!!features.tournament);
+  
+  // Анимации
+  if (changes.animationsEnabled) {
+    enableAnimations(!!changes.animationsEnabled.newValue);
   }
 });
 
+// ============================================
+// Обработчик сообщений от popup
+// ============================================
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log("[ChesscomSkins] Message received:", request);
+  
+  if (request.action === "setGlowIntensity") {
+    setGlowIntensity(request.intensity);
+    sendResponse({ success: true });
+  }
+  
+  return true;
+});
+
+// ============================================
+// Запуск
+// ============================================
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", watchForGameStart);
+  document.addEventListener("DOMContentLoaded", initialize);
 } else {
-  watchForGameStart();
+  initialize();
 }

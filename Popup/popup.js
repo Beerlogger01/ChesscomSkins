@@ -1,72 +1,39 @@
+// ============================================
+// ChesscomSkins - Popup Script
+// Простая и понятная реализация
+// ============================================
+
 const PIECES = ["wk", "wq", "wr", "wb", "wn", "wp", "bk", "bq", "br", "bb", "bn", "bp"];
 
+// DOM элементы
 const toggle = document.getElementById("toggle");
 const skinsContainer = document.getElementById("skins-container");
-const effectPreviewImages = document.querySelectorAll(".effect-preview");
-const targetButtons = document.querySelectorAll(".target-button");
-const cracksButton = document.querySelector(".cracks-button");
-const glowIntensitySlider = document.getElementById("glow-intensity");
+const effectKings = document.querySelectorAll(".effect-king");
+const effectPreviews = document.querySelectorAll(".effect-preview");
+const glowSlider = document.getElementById("glow-intensity");
 const intensityValue = document.querySelector(".intensity-value");
 const boardButtons = document.querySelectorAll(".board-button");
-const featureButtons = document.querySelectorAll(".feature-button");
-const importButton = document.querySelector(".import-button");
-const exportButton = document.querySelector(".export-button");
+const animationButtons = document.querySelectorAll(".animation-button");
+const extrasButtons = document.querySelectorAll(".extras-button");
 
-let currentActiveSkin = null;
-let currentActiveEffect = null;
-let currentTarget = "all";
-let cracksEnabled = false;
+// Состояние
 let loadedSkins = [];
-let currentBoardStyle = "default";
-let enabledFeatures = {
-  animation: false,
-  particles: false,
-  tournament: false
-};
-
-let stateLoaded = false;
-const DEFAULTS = {
+let state = {
   enabled: false,
-  activeSet: null,
   activeSkin: null,
-  activeEffect: "none",
-  activeTarget: "all",
-  cracksEnabled: false,
-  glowIntensity: 0.7,
+  activeEffect: null,
   boardStyle: "default",
-  enabledFeatures: {
-    animation: false,
-    particles: false,
-    tournament: false
-  }
+  glowIntensity: 1.0,
+  particlesEnabled: false,
+  cracksEnabled: false,
+  animationsEnabled: false,
+  tournamentMode: false
 };
 
-// Кэширование селекторов для производительности
-let cachedSelectors = {
-  skinSets: null,
-  effectKings: null
-};
-
-function getSkinSets() {
-  if (!cachedSelectors.skinSets) {
-    cachedSelectors.skinSets = document.querySelectorAll('.set[data-type="skin"]');
-  }
-  return cachedSelectors.skinSets;
-}
-
-function getEffectKings() {
-  if (!cachedSelectors.effectKings) {
-    cachedSelectors.effectKings = document.querySelectorAll(".effect-king");
-  }
-  return cachedSelectors.effectKings;
-}
-
-function clearSelectorCache() {
-  cachedSelectors.skinSets = null;
-  cachedSelectors.effectKings = null;
-}
-
+// ============================================
 // Загрузка конфига скинов
+// ============================================
+
 async function loadSkinsConfig() {
   try {
     const url = chrome.runtime.getURL("assets/skins.json");
@@ -75,410 +42,325 @@ async function loadSkinsConfig() {
     
     if (config.skins && Array.isArray(config.skins)) {
       loadedSkins = config.skins;
-      renderSkinsUI();
-      // После отрисовки скинов подтянем сохранённое состояние UI
-      await initStateFromStorage();
+      renderSkins();
     }
+    
+    console.log("[Popup] Skins loaded:", loadedSkins);
   } catch (error) {
-    console.error("[ChesscomSkins Popup] Ошибка загрузки конфига:", error);
+    console.error("[Popup] Failed to load skins:", error);
   }
 }
 
-// Генерация HTML для скина
-function createSkinElement(skin) {
-  const darkThemes = ["set2"];
-  const isDark = darkThemes.includes(skin.id);
-  const previewClass = isDark ? "dark" : "light";
-  
-  const skinDiv = document.createElement("div");
-  skinDiv.className = "set disabled";
-  skinDiv.dataset.set = skin.id;
-  skinDiv.dataset.type = "skin";
-  
-  const button = document.createElement("button");
-  button.className = "set-toggle";
-  button.textContent = skin.name;
-  skinDiv.appendChild(button);
-  
-  const preview = document.createElement("div");
-  preview.className = `preview ${previewClass}`;
-  preview.dataset.label = skin.name;
-  
-  // Добавляем все фигуры
-  PIECES.forEach(piece => {
-    const img = document.createElement("img");
-    img.src = `../assets/${skin.folder}/${piece}.png`;
-    img.alt = piece;
-    preview.appendChild(img);
-  });
-  
-  skinDiv.appendChild(preview);
-  return skinDiv;
-}
+// ============================================
+// Рендер скинов
+// ============================================
 
-// Рендеринг всех скинов
-function renderSkinsUI() {
+function renderSkins() {
   skinsContainer.innerHTML = "";
+  
   loadedSkins.forEach(skin => {
-    skinsContainer.appendChild(createSkinElement(skin));
-  });
-  
-  // Очищаем кэш и переинициализируем обработчики
-  clearSelectorCache();
-  initSkinHandlers();
-}
-
-async function initStateFromStorage() {
-  if (stateLoaded) return;
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(
-      ["enabled", "activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled", "glowIntensity", "boardStyle", "enabledFeatures"],
-      data => {
-        stateLoaded = true;
-        const merged = {
-          ...DEFAULTS,
-          ...data,
-          enabledFeatures: { ...DEFAULTS.enabledFeatures, ...(data.enabledFeatures || {}) }
-        };
-
-        toggle.checked = !!merged.enabled;
-        const activeSet = merged.activeSet && merged.activeSet !== "none" ? merged.activeSet : null;
-        const activeSkin = merged.activeSkin && merged.activeSkin !== "none" ? merged.activeSkin : null;
-        const activeEffect = merged.activeEffect && merged.activeEffect !== "none" ? merged.activeEffect : null;
-
-        currentActiveSkin = activeSkin || (activeSet && loadedSkins.length ? activeSet : null) || loadedSkins[0]?.id || null;
-        currentActiveEffect = activeEffect || DEFAULTS.activeEffect;
-        currentTarget = merged.activeTarget || DEFAULTS.activeTarget;
-        cracksEnabled = merged.cracksEnabled ?? DEFAULTS.cracksEnabled;
-        currentBoardStyle = merged.boardStyle || DEFAULTS.boardStyle;
-        enabledFeatures = merged.enabledFeatures;
-
-        // Устанавливаем интенсивность
-        if (glowIntensitySlider) {
-          const val = merged.glowIntensity ?? DEFAULTS.glowIntensity;
-          glowIntensitySlider.value = val;
-          intensityValue.textContent = Math.round(val * 100) + "%";
-        }
-
-        // Устанавливаем активный стиль доски
-        boardButtons.forEach(btn => {
-          btn.classList.toggle("active", btn.dataset.board === currentBoardStyle);
-        });
-
-        // Устанавливаем активные фичи
-        featureButtons.forEach(btn => {
-          btn.classList.toggle("active", enabledFeatures[btn.dataset.feature]);
-        });
-
-        setActiveSkinUI(currentActiveSkin);
-        setActiveEffectUI(currentActiveEffect);
-        setActiveTargetUI(currentTarget);
-        setCracksUI(cracksEnabled);
-        updateEffectPreviews(currentActiveSkin || loadedSkins[0]?.id || "set2");
-        updateUI(toggle.checked);
-        resolve();
-      }
-    );
-  });
-}
-
-// Инициализация обработчиков для скинов
-function initSkinHandlers() {
-  const skinSets = getSkinSets();
-  
-  skinSets.forEach(set => {
-    const setName = set.dataset.set;
-    if (!setName) return;
-    const button = set.querySelector("button");
-    if (!button) return;
-
+    const skinDiv = document.createElement("div");
+    skinDiv.className = "set disabled";
+    skinDiv.dataset.skin = skin.id;
+    
+    // Тёмные темы
+    const darkThemes = ["set2"];
+    if (darkThemes.includes(skin.id)) {
+      skinDiv.classList.add("festive");
+    }
+    
+    // Кнопка
+    const button = document.createElement("button");
+    button.className = "set-toggle";
+    button.textContent = skin.name;
+    skinDiv.appendChild(button);
+    
+    // Превью фигур
+    const preview = document.createElement("div");
+    preview.className = darkThemes.includes(skin.id) ? "preview dark" : "preview light";
+    preview.dataset.label = skin.name;
+    
+    PIECES.forEach(piece => {
+      const img = document.createElement("img");
+      img.src = `../assets/${skin.folder}/${piece}.png`;
+      img.alt = piece;
+      preview.appendChild(img);
+    });
+    
+    skinDiv.appendChild(preview);
+    skinsContainer.appendChild(skinDiv);
+    
+    // Обработчик клика
     button.addEventListener("click", () => {
-      if (!toggle.checked) return;
-
-      const isSame = currentActiveSkin === setName;
-      const nextSkin = isSame ? "none" : setName;
-      const nextSet = isSame ? "none" : setName;
-
-      chrome.storage.sync.set({ activeSet: nextSet, activeSkin: nextSkin }, () => {
-        currentActiveSkin = isSame ? null : setName;
-        setActiveSkinUI(currentActiveSkin);
-        updateEffectPreviews(currentActiveSkin || loadedSkins[0]?.id || "set2");
-      });
+      if (!state.enabled) return;
+      
+      const newSkin = state.activeSkin === skin.id ? null : skin.id;
+      state.activeSkin = newSkin;
+      
+      chrome.storage.sync.set({ activeSkin: newSkin || "none" });
+      updateSkinUI();
+      updateEffectPreviews();
     });
   });
 }
 
-function updateEffectPreviews(activeSkin) {
-  const skin = loadedSkins.find(s => s.id === activeSkin) || loadedSkins[0];
+// ============================================
+// Обновление UI
+// ============================================
+
+function updateUI() {
+  const enabled = state.enabled;
+  
+  // Скины
+  document.querySelectorAll(".set").forEach(el => {
+    el.classList.toggle("disabled", !enabled);
+  });
+  
+  // Все контролы
+  document.querySelectorAll(".glow-intensity-control, .board-styles-control, .animations-control, .extras-control").forEach(el => {
+    el.classList.toggle("disabled", !enabled);
+  });
+  
+  updateSkinUI();
+  updateEffectUI();
+  updateBoardUI();
+  updateAnimationsUI();
+  updateExtrasUI();
+}
+
+function updateSkinUI() {
+  document.querySelectorAll(".set").forEach(el => {
+    el.classList.toggle("active", el.dataset.skin === state.activeSkin);
+  });
+}
+
+function updateEffectUI() {
+  effectKings.forEach(king => {
+    king.classList.toggle("active", king.dataset.effect === state.activeEffect);
+  });
+}
+
+function updateBoardUI() {
+  boardButtons.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.board === state.boardStyle);
+  });
+}
+
+function updateAnimationsUI() {
+  animationButtons.forEach(btn => {
+    const anim = btn.dataset.anim;
+    let isActive = false;
+    
+    if (anim === "particles") isActive = state.particlesEnabled;
+    else if (anim === "cracks") isActive = state.cracksEnabled;
+    else if (anim === "animation") isActive = state.animationsEnabled;
+    
+    btn.classList.toggle("active", isActive);
+  });
+}
+
+function updateExtrasUI() {
+  extrasButtons.forEach(btn => {
+    if (btn.dataset.extra === "tournament") {
+      btn.classList.toggle("active", state.tournamentMode);
+    }
+  });
+}
+
+function updateEffectPreviews() {
+  const skin = loadedSkins.find(s => s.id === state.activeSkin) || loadedSkins[0];
   if (!skin) return;
   
   const src = `../assets/${skin.folder}/${skin.previewPiece || "wk"}.png`;
-  effectPreviewImages.forEach((img) => {
+  effectPreviews.forEach(img => {
     img.src = src;
   });
 }
 
-// Инициализация обработчиков эффектов
-function initEffectHandlers() {
-  const effectKings = getEffectKings();
-  
-  effectKings.forEach((king) => {
-    const effectName = king.dataset.effect;
-    if (!effectName) return;
+// ============================================
+// Инициализация из storage
+// ============================================
 
-    king.addEventListener("click", () => {
-      if (!toggle.checked) return;
-
-      const isSame = currentActiveEffect === effectName;
-      const nextEffect = isSame ? "none" : effectName;
-
-      chrome.storage.sync.set({ activeEffect: nextEffect }, () => {
-        currentActiveEffect = isSame ? null : effectName;
-        setActiveEffectUI(currentActiveEffect);
-      });
+async function initFromStorage() {
+  return new Promise(resolve => {
+    chrome.storage.sync.get([
+      "enabled",
+      "activeSkin",
+      "activeEffect",
+      "boardStyle",
+      "glowIntensity",
+      "particlesEnabled",
+      "cracksEnabled",
+      "animationsEnabled",
+      "tournamentMode"
+    ], data => {
+      console.log("[Popup] Storage data:", data);
+      
+      state.enabled = !!data.enabled;
+      state.activeSkin = (data.activeSkin && data.activeSkin !== "none") ? data.activeSkin : null;
+      state.activeEffect = (data.activeEffect && data.activeEffect !== "none") ? data.activeEffect : null;
+      state.boardStyle = data.boardStyle || "default";
+      state.glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+      state.particlesEnabled = !!data.particlesEnabled;
+      state.cracksEnabled = !!data.cracksEnabled;
+      state.animationsEnabled = !!data.animationsEnabled;
+      state.tournamentMode = !!data.tournamentMode;
+      
+      // Обновляем UI элементы
+      toggle.checked = state.enabled;
+      
+      if (glowSlider) {
+        glowSlider.value = state.glowIntensity;
+        intensityValue.textContent = Math.round(state.glowIntensity * 100) + "%";
+      }
+      
+      updateUI();
+      updateEffectPreviews();
+      
+      resolve();
     });
   });
 }
 
-// Первичная инициализация после загрузки конфига
-initStateFromStorage();
+// ============================================
+// Обработчики событий
+// ============================================
 
+// Главный переключатель
 toggle.addEventListener("change", () => {
-  if (!toggle.checked) {
-    chrome.storage.sync.set({ enabled: false });
-    updateUI(false);
-  } else {
-    chrome.storage.sync.get(
-      ["activeSet", "activeSkin", "activeEffect", "activeTarget", "cracksEnabled", "boardStyle", "glowIntensity", "enabledFeatures"],
-      (data) => {
-      // Устанавливаем дефолты, если ничего не сохранено
-      const merged = {
-        ...DEFAULTS,
-        ...data,
-        enabledFeatures: { ...DEFAULTS.enabledFeatures, ...(data.enabledFeatures || {}) }
-      };
-
-      const nextSkin = merged.activeSkin || merged.activeSet || loadedSkins[0]?.id || "set2";
-      chrome.storage.sync.set({
-        enabled: true,
-        activeSkin: nextSkin,
-        activeSet: nextSkin,
-        activeEffect: merged.activeEffect || DEFAULTS.activeEffect,
-        activeTarget: merged.activeTarget || DEFAULTS.activeTarget,
-        cracksEnabled: merged.cracksEnabled ?? DEFAULTS.cracksEnabled,
-        boardStyle: merged.boardStyle || DEFAULTS.boardStyle,
-        glowIntensity: merged.glowIntensity ?? DEFAULTS.glowIntensity,
-        enabledFeatures: merged.enabledFeatures
-      });
-
-      updateUI(true);
-      currentActiveSkin = nextSkin;
-      currentActiveEffect = merged.activeEffect || DEFAULTS.activeEffect;
-      currentTarget = merged.activeTarget || DEFAULTS.activeTarget;
-      cracksEnabled = merged.cracksEnabled ?? DEFAULTS.cracksEnabled;
-      currentBoardStyle = merged.boardStyle || DEFAULTS.boardStyle;
-      enabledFeatures = merged.enabledFeatures;
-      setActiveSkinUI(currentActiveSkin);
-      setActiveEffectUI(currentActiveEffect);
-      setActiveTargetUI(currentTarget);
-      setCracksUI(cracksEnabled);
-      updateEffectPreviews(currentActiveSkin || loadedSkins[0]?.id || "set2");
-    });
-  }
-});
-
-targetButtons.forEach((button) => {
-  const target = button.dataset.target;
-  if (!target) return;
-
-  button.addEventListener("click", () => {
-    if (!toggle.checked) return;
-    currentTarget = target;
-    chrome.storage.sync.set({ activeTarget: target }, () => {
-      setActiveTargetUI(currentTarget);
-    });
-  });
-});
-
-if (cracksButton) {
-  cracksButton.addEventListener("click", () => {
-    if (!toggle.checked) return;
-    cracksEnabled = !cracksEnabled;
-    chrome.storage.sync.set({ cracksEnabled }, () => {
-      setCracksUI(cracksEnabled);
-    });
-  });
-}
-
-function updateUI(enabled) {
-  getSkinSets().forEach(set => {
-    set.classList.toggle("disabled", !enabled);
-  });
-  const effectContainer = document.querySelector('.set[data-type="effect"]');
-  if (effectContainer) {
-    effectContainer.classList.toggle("disabled", !enabled);
-  }
-  const targetToggle = document.querySelector(".target-toggle");
-  if (targetToggle) {
-    targetToggle.classList.toggle("disabled", !enabled);
-  }
-  if (cracksButton) {
-    const cracksContainer = cracksButton.closest(".cracks-toggle");
-    if (cracksContainer) {
-      cracksContainer.classList.toggle("disabled", !enabled);
+  state.enabled = toggle.checked;
+  
+  if (state.enabled) {
+    // При включении устанавливаем дефолтный скин если не выбран
+    if (!state.activeSkin && loadedSkins.length > 0) {
+      state.activeSkin = loadedSkins[0].id;
     }
-  }
-
-  const glowControl = document.querySelector(".glow-intensity-control");
-  if (glowControl) {
-    glowControl.classList.toggle("disabled", !enabled);
-  }
-
-  const boardControl = document.querySelector(".board-styles-control");
-  if (boardControl) {
-    boardControl.classList.toggle("disabled", !enabled);
-  }
-
-  const featureControl = document.querySelector(".features-toggle");
-  if (featureControl) {
-    featureControl.classList.toggle("disabled", !enabled);
-  }
-
-  const importExport = document.querySelector(".import-export-section");
-  if (importExport) {
-    importExport.classList.toggle("disabled", !enabled);
-  }
-}
-
-function setActiveSkinUI(activeID) {
-  getSkinSets().forEach(set => {
-    set.classList.toggle("active", activeID && set.dataset.set === activeID);
-  });
-}
-
-function setActiveEffectUI(activeID) {
-  getEffectKings().forEach((king) => {
-    king.classList.toggle("active", activeID && king.dataset.effect === activeID);
-  });
-}
-
-function setActiveTargetUI(activeID) {
-  targetButtons.forEach((button) => {
-    button.classList.toggle("active", activeID && button.dataset.target === activeID);
-  });
-}
-
-// ========== НОВЫЕ ОБРАБОТЧИКИ ==========
-
-// Бегунок интенсивности свечения
-if (glowIntensitySlider) {
-  glowIntensitySlider.addEventListener("input", (e) => {
-    const intensity = parseFloat(e.target.value);
-    const percent = Math.round(intensity * 100);
-    intensityValue.textContent = percent + "%";
     
-    chrome.storage.sync.set({ glowIntensity: intensity });
+    chrome.storage.sync.set({
+      enabled: true,
+      activeSkin: state.activeSkin || "none",
+      activeEffect: state.activeEffect || "none",
+      boardStyle: state.boardStyle,
+      glowIntensity: state.glowIntensity,
+      particlesEnabled: state.particlesEnabled,
+      cracksEnabled: state.cracksEnabled,
+      animationsEnabled: state.animationsEnabled
+    });
+  } else {
+    chrome.storage.sync.set({ enabled: false });
+  }
+  
+  updateUI();
+});
+
+// Эффекты свечения
+effectKings.forEach(king => {
+  king.addEventListener("click", () => {
+    if (!state.enabled) return;
     
-    // Отправляем сообщение в content script
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, {
+    const effect = king.dataset.effect;
+    const newEffect = state.activeEffect === effect ? null : effect;
+    state.activeEffect = newEffect;
+    
+    chrome.storage.sync.set({ activeEffect: newEffect || "none" });
+    updateEffectUI();
+  });
+});
+
+// Слайдер интенсивности
+if (glowSlider) {
+  glowSlider.addEventListener("input", e => {
+    const val = parseFloat(e.target.value);
+    state.glowIntensity = val;
+    intensityValue.textContent = Math.round(val * 100) + "%";
+    
+    chrome.storage.sync.set({ glowIntensity: val });
+    
+    // Отправляем сообщение в content script для мгновенного обновления
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {
           action: "setGlowIntensity",
-          intensity: intensity
-        }, () => {});
-      });
+          intensity: val
+        }).catch(() => {});
+      }
     });
   });
 }
 
 // Стили доски
-boardButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    if (!toggle.checked) return;
+boardButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!state.enabled) return;
     
-    const boardStyle = button.dataset.board;
-    currentBoardStyle = boardStyle;
-    
-    chrome.storage.sync.set({ boardStyle });
-    
-    // Обновляем UI
-    boardButtons.forEach(b => {
-      b.classList.toggle("active", b.dataset.board === boardStyle);
-    });
-    
-    // Отправляем в content script
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "setBoardStyle",
-          style: boardStyle
-        }, () => {});
-      });
-    });
+    state.boardStyle = btn.dataset.board;
+    chrome.storage.sync.set({ boardStyle: state.boardStyle });
+    updateBoardUI();
   });
 });
 
-// Фичи (анимация, частицы, турнамент)
-featureButtons.forEach(button => {
-  button.addEventListener("click", () => {
-    if (!toggle.checked) return;
+// Анимации (частицы, трещины, анимация)
+animationButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!state.enabled) return;
     
-    const feature = button.dataset.feature;
-    enabledFeatures[feature] = !enabledFeatures[feature];
+    const anim = btn.dataset.anim;
     
-    button.classList.toggle("active", enabledFeatures[feature]);
+    if (anim === "particles") {
+      state.particlesEnabled = !state.particlesEnabled;
+      chrome.storage.sync.set({ particlesEnabled: state.particlesEnabled });
+    } else if (anim === "cracks") {
+      state.cracksEnabled = !state.cracksEnabled;
+      chrome.storage.sync.set({ cracksEnabled: state.cracksEnabled });
+    } else if (anim === "animation") {
+      state.animationsEnabled = !state.animationsEnabled;
+      chrome.storage.sync.set({ animationsEnabled: state.animationsEnabled });
+    }
     
-    chrome.storage.sync.set({
-      enabledFeatures
-    });
-    
-    // Отправляем в content script
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "setFeature",
-          feature,
-          enabled: enabledFeatures[feature]
-        }, () => {});
-      });
-    });
+    updateAnimationsUI();
   });
 });
 
-// Импорт скина
-if (importButton) {
-  importButton.addEventListener("click", () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".zip";
-    input.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+// Extras (турнамент, импорт, экспорт)
+extrasButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.classList.contains("import-btn")) {
+      // Импорт скина
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".zip";
+      input.addEventListener("change", e => {
+        const file = e.target.files?.[0];
+        if (file) {
+          alert("Функция импорта скинов будет добавлена позже.\n\nПока добавляйте скины вручную в папку assets/ и обновляйте assets/skins.json");
+        }
+      });
+      input.click();
+      return;
+    }
+    
+    if (btn.classList.contains("export-btn")) {
+      alert("Функция экспорта будет добавлена позже.");
+      return;
+    }
+    
+    if (btn.dataset.extra === "tournament") {
+      if (!state.enabled) return;
       
-      // Базовая проверка
-      if (!file.name.endsWith(".zip")) {
-        alert("Please select a .zip file");
-        return;
-      }
-      
-      alert("Skin import feature will be available soon. Please manually add skin files to assets/ folder and update assets/skins.json");
-    });
-    input.click();
+      state.tournamentMode = !state.tournamentMode;
+      chrome.storage.sync.set({ tournamentMode: state.tournamentMode });
+      updateExtrasUI();
+    }
   });
+});
+
+// ============================================
+// Запуск
+// ============================================
+
+async function init() {
+  await loadSkinsConfig();
+  await initFromStorage();
 }
 
-// Экспорт скина
-if (exportButton) {
-  exportButton.disabled = true; // На данный момент отключена
-}
-
-// Функция установки UI для трещин
-function setCracksUI(enabled) {
-  if (!cracksButton) return;
-  cracksButton.classList.toggle("active", enabled);
-  cracksButton.textContent = enabled ? "Disable cracks" : "Enable cracks";
-}
-
-// Инициализация
-loadSkinsConfig();
-initEffectHandlers();
+init();
