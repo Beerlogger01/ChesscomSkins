@@ -447,7 +447,7 @@ async function initializeFromStorage() {
     (data) => {
       skinsEnabled = !!data.enabled;
       glowIntensity = clampIntensity(data.glowIntensity, glowIntensity);
-      effectsEnabled = true; // разрешаем применять эффекты после первого чтения state
+      effectsEnabled = skinsEnabled; // включаем эффекты только если включено расширение
 
       let activeSkin = data.activeSkin;
       let activeEffect = data.activeEffect;
@@ -464,7 +464,9 @@ async function initializeFromStorage() {
 
         if (skinsEnabled) {
           applySkin(activeSkin || "set2", skinPath || null);
-          applyEffect(activeEffect || "minimal", activeTarget);
+          if (activeEffect && activeEffect !== "none") {
+            applyEffect(activeEffect, activeTarget);
+          }
           applyBoardStyle(data.boardStyle || "default");
 
           const features = data.enabledFeatures || {};

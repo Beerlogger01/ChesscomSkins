@@ -29,10 +29,10 @@ const DEFAULTS = {
   enabled: false,
   activeSet: null,
   activeSkin: null,
-  activeEffect: "native-ember",
+  activeEffect: "none",
   activeTarget: "all",
-  cracksEnabled: true,
-  glowIntensity: 1,
+  cracksEnabled: false,
+  glowIntensity: 0.7,
   boardStyle: "default",
   enabledFeatures: {
     animation: false,

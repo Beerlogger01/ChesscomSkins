@@ -519,21 +519,20 @@ function stopObservers() {
 chrome.storage.sync.get(["enabled", "cracksEnabled", "enabledFeatures"], (data) => {
   overlaysEnabled = !!data.enabled;
   const hasCracksKey = Object.prototype.hasOwnProperty.call(data, "cracksEnabled");
-  cracksEnabled = hasCracksKey ? !!data.cracksEnabled : true; // по умолчанию включаем трещины
+  cracksEnabled = hasCracksKey ? !!data.cracksEnabled : false; // безопасный дефолт: OFF
   particlesEnabled = !!data.enabledFeatures?.particles;
   if (!hasCracksKey) {
     chrome.storage.sync.set({ cracksEnabled });
   }
-  // Не запускаем bootstrap при document_start - ждём полной загрузки
   if (document.readyState === "complete") {
-    if (overlaysEnabled) bootstrap();
+    if (overlaysEnabled && cracksEnabled) bootstrap();
   }
 });
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.enabled) {
     overlaysEnabled = !!changes.enabled.newValue;
-    if (overlaysEnabled) {
+    if (overlaysEnabled && cracksEnabled) {
       bootstrap();
     } else {
       stopObservers();
@@ -541,8 +540,10 @@ chrome.storage.onChanged.addListener((changes) => {
   }
   if (changes.cracksEnabled) {
     cracksEnabled = !!changes.cracksEnabled.newValue;
-    if (cracksEnabled && overlaysEnabled && !boardObserver) {
+    if (cracksEnabled && overlaysEnabled) {
       bootstrap();
+    } else if (!cracksEnabled) {
+      stopObservers();
     }
   }
 
