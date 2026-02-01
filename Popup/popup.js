@@ -12,6 +12,7 @@ const effectKings = document.querySelectorAll(".effect-king");
 const effectPreviews = document.querySelectorAll(".effect-preview");
 const glowSlider = document.getElementById("glow-intensity");
 const intensityValue = document.querySelector(".intensity-value");
+const targetButtons = document.querySelectorAll(".target-button");
 const boardButtons = document.querySelectorAll(".board-button");
 const animationButtons = document.querySelectorAll(".animation-button");
 const extrasButtons = document.querySelectorAll(".extras-button");
@@ -24,9 +25,9 @@ let state = {
   activeEffect: null,
   boardStyle: "default",
   glowIntensity: 1.0,
+  glowTarget: "all",
   particlesEnabled: false,
   cracksEnabled: false,
-  animationsEnabled: false,
   tournamentMode: false
 };
 
@@ -117,12 +118,13 @@ function updateUI() {
   });
   
   // Все контролы
-  document.querySelectorAll(".glow-intensity-control, .board-styles-control, .animations-control, .extras-control").forEach(el => {
+  document.querySelectorAll(".glow-intensity-control, .target-toggle, .board-styles-control, .animations-control, .extras-control").forEach(el => {
     el.classList.toggle("disabled", !enabled);
   });
   
   updateSkinUI();
   updateEffectUI();
+  updateTargetUI();
   updateBoardUI();
   updateAnimationsUI();
   updateExtrasUI();
@@ -140,6 +142,12 @@ function updateEffectUI() {
   });
 }
 
+function updateTargetUI() {
+  targetButtons.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.target === state.glowTarget);
+  });
+}
+
 function updateBoardUI() {
   boardButtons.forEach(btn => {
     btn.classList.toggle("active", btn.dataset.board === state.boardStyle);
@@ -153,7 +161,6 @@ function updateAnimationsUI() {
     
     if (anim === "particles") isActive = state.particlesEnabled;
     else if (anim === "cracks") isActive = state.cracksEnabled;
-    else if (anim === "animation") isActive = state.animationsEnabled;
     
     btn.classList.toggle("active", isActive);
   });
@@ -189,9 +196,9 @@ async function initFromStorage() {
       "activeEffect",
       "boardStyle",
       "glowIntensity",
+      "glowTarget",
       "particlesEnabled",
       "cracksEnabled",
-      "animationsEnabled",
       "tournamentMode"
     ], data => {
       console.log("[Popup] Storage data:", data);
@@ -201,9 +208,9 @@ async function initFromStorage() {
       state.activeEffect = (data.activeEffect && data.activeEffect !== "none") ? data.activeEffect : null;
       state.boardStyle = data.boardStyle || "default";
       state.glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+      state.glowTarget = data.glowTarget || "all";
       state.particlesEnabled = !!data.particlesEnabled;
       state.cracksEnabled = !!data.cracksEnabled;
-      state.animationsEnabled = !!data.animationsEnabled;
       state.tournamentMode = !!data.tournamentMode;
       
       // Обновляем UI элементы
@@ -242,9 +249,9 @@ toggle.addEventListener("change", () => {
       activeEffect: state.activeEffect || "none",
       boardStyle: state.boardStyle,
       glowIntensity: state.glowIntensity,
+      glowTarget: state.glowTarget,
       particlesEnabled: state.particlesEnabled,
-      cracksEnabled: state.cracksEnabled,
-      animationsEnabled: state.animationsEnabled
+      cracksEnabled: state.cracksEnabled
     });
   } else {
     chrome.storage.sync.set({ enabled: false });
@@ -299,7 +306,18 @@ boardButtons.forEach(btn => {
   });
 });
 
-// Анимации (частицы, трещины, анимация)
+// Target для свечения (All / Royal)
+targetButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (!state.enabled) return;
+    
+    state.glowTarget = btn.dataset.target;
+    chrome.storage.sync.set({ glowTarget: state.glowTarget });
+    updateTargetUI();
+  });
+});
+
+// Анимации (частицы, трещины)
 animationButtons.forEach(btn => {
   btn.addEventListener("click", () => {
     if (!state.enabled) return;
@@ -312,9 +330,6 @@ animationButtons.forEach(btn => {
     } else if (anim === "cracks") {
       state.cracksEnabled = !state.cracksEnabled;
       chrome.storage.sync.set({ cracksEnabled: state.cracksEnabled });
-    } else if (anim === "animation") {
-      state.animationsEnabled = !state.animationsEnabled;
-      chrome.storage.sync.set({ animationsEnabled: state.animationsEnabled });
     }
     
     updateAnimationsUI();

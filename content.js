@@ -11,6 +11,7 @@ let currentSkin = null;
 let currentEffect = null;
 let currentBoardStyle = null;
 let glowIntensity = 1.0;
+let glowTarget = "all"; // "all" или "royal"
 let animationsEnabled = false;
 
 // DOM элементы для стилей
@@ -156,8 +157,14 @@ function applyEffect(effectId) {
   // Вычисляем размер свечения с учётом интенсивности
   const actualGlowSize = Math.round(effect.glowSize * glowIntensity);
   
+  // Селектор зависит от target
+  let pieceSelector = ".piece";
+  if (glowTarget === "royal") {
+    pieceSelector = ".piece.wk, .piece.bk, .piece.wq, .piece.bq";
+  }
+  
   const css = `
-    .piece {
+    ${pieceSelector} {
       filter: ${effect.filter} drop-shadow(0 0 ${actualGlowSize}px ${effect.glowColor}) !important;
       transition: filter 0.2s ease;
     }
@@ -201,65 +208,52 @@ function applyBoardStyle(styleId) {
     return;
   }
   
-  // Chess.com использует CSS переменные и разные методы для стилизации доски
-  // Применяем через CSS переменные и прямые селекторы для wc-chess-board
+  // Chess.com использует wc-chess-board с SVG внутри
+  // Основной способ - переопределение CSS custom properties и fill для SVG
   
   let css = `
-    /* CSS переменные для доски */
-    wc-chess-board,
-    chess-board,
-    .board {
-      --light-color: ${style.lightColor} !important;
-      --dark-color: ${style.darkColor} !important;
+    /* Переопределяем CSS переменные chess.com */
+    :root {
+      --theme-board-style-light: ${style.lightColor} !important;
+      --theme-board-style-dark: ${style.darkColor} !important;
     }
     
-    /* Прямые стили для координатной сетки (старый способ chess.com) */
-    .coordinates-light {
-      fill: ${style.darkColor} !important;
-      color: ${style.darkColor} !important;
-    }
-    .coordinates-dark {
+    /* Стили для SVG rect элементов внутри wc-chess-board */
+    wc-chess-board svg rect.light-square,
+    wc-chess-board svg .light {
       fill: ${style.lightColor} !important;
-      color: ${style.lightColor} !important;
     }
     
-    /* Стили для SVG доски */
-    wc-chess-board .light,
-    chess-board .light,
+    wc-chess-board svg rect.dark-square,
+    wc-chess-board svg .dark {
+      fill: ${style.darkColor} !important;
+    }
+    
+    /* Fallback для canvas-based доски через filter */
+    wc-chess-board {
+      --cb-light: ${style.lightColor} !important;
+      --cb-dark: ${style.darkColor} !important;
+    }
+    
+    /* Старый способ через классы */
+    .board .square-light,
     .board .light {
-      fill: ${style.lightColor} !important;
-    }
-    
-    wc-chess-board .dark,
-    chess-board .dark,
-    .board .dark {
-      fill: ${style.darkColor} !important;
-    }
-    
-    /* Альтернативный способ через псевдокласс для элементов с data-square */
-    [data-square] {
-      background: none !important;
-    }
-    
-    /* Стилизация через класс чётности */
-    .board-square-light,
-    [class*="square"][class*="light"] {
       background-color: ${style.lightColor} !important;
     }
     
-    .board-square-dark,
-    [class*="square"][class*="dark"] {
+    .board .square-dark,
+    .board .dark {
       background-color: ${style.darkColor} !important;
     }
   `;
   
-  // Для neon стиля добавляем свечение на саму доску
+  // Для neon стиля добавляем свечение на контейнер доски
   if (style.glowColor) {
     css += `
       wc-chess-board,
-      chess-board,
-      .board {
-        box-shadow: 0 0 30px ${style.glowColor}, inset 0 0 60px rgba(0,0,0,0.3) !important;
+      .board-layout-main {
+        box-shadow: 0 0 40px ${style.glowColor} !important;
+        border-radius: 4px;
       }
     `;
   }
@@ -371,12 +365,14 @@ async function initialize() {
     "activeEffect",
     "boardStyle",
     "glowIntensity",
+    "glowTarget",
     "animationsEnabled"
   ], (data) => {
     console.log("[ChesscomSkins] Storage data:", data);
     
     skinsEnabled = !!data.enabled;
     glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+    glowTarget = data.glowTarget || "all";
     
     if (skinsEnabled) {
       if (data.activeSkin && data.activeSkin !== "none") {
@@ -409,8 +405,9 @@ chrome.storage.onChanged.addListener((changes) => {
       disableAll();
     } else {
       // При включении применяем сохранённые настройки
-      chrome.storage.sync.get(["activeSkin", "activeEffect", "boardStyle", "glowIntensity", "animationsEnabled"], (data) => {
+      chrome.storage.sync.get(["activeSkin", "activeEffect", "boardStyle", "glowIntensity", "glowTarget", "animationsEnabled"], (data) => {
         glowIntensity = parseFloat(data.glowIntensity) || 1.0;
+        glowTarget = data.glowTarget || "all";
         if (data.activeSkin) applySkin(data.activeSkin);
         if (data.activeEffect) applyEffect(data.activeEffect);
         if (data.boardStyle) applyBoardStyle(data.boardStyle);
@@ -440,6 +437,15 @@ chrome.storage.onChanged.addListener((changes) => {
   // Изменение интенсивности
   if (changes.glowIntensity) {
     setGlowIntensity(changes.glowIntensity.newValue);
+  }
+  
+  // Изменение target свечения
+  if (changes.glowTarget) {
+    glowTarget = changes.glowTarget.newValue || "all";
+    // Перепрменяем эффект с новым target
+    if (currentEffect && currentEffect !== "none") {
+      applyEffect(currentEffect);
+    }
   }
   
   // Анимации
