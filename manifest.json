@@ -1,16 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Chess.com Custom Skins",
-  "version": "1.0",
+  "description": "Custom piece skins, board themes and lightweight glow effects for chess.com — with performance modes for any laptop.",
+  "version": "3.0.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_popup": "Popup/popup.html"
+    "default_popup": "Popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": ["*://*.chess.com/*"],
-      "js": ["content.js", "content-script.js"],
-      "css": ["styles.css"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],

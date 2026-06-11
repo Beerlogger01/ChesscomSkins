@@ -5,84 +5,128 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+<div class="shell" data-testid="popup-shell">
 
-  <div class="top-box">
-    <h1>Custom skins activation</h1>
-    <label class="switch">
-      <input type="checkbox" id="toggle">
-      <span class="slider"></span>
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">&#9822;</div>
+      <div class="brand-text">
+        <h1>CHESS SKINS</h1>
+        <span class="version mono">v3.0 &middot; chess.com</span>
+      </div>
+    </div>
+    <label class="switch" data-testid="master-toggle">
+      <input type="checkbox" id="toggle" />
+      <span class="slider-knob"></span>
     </label>
-  </div>
+  </header>
 
-  <h2>Choose custom skin</h2>
-
-  <div class="preview-window">
-    <div id="skins-container"></div>
-    <div class="preview light effect-preview-tile" data-label="Glow Effects">
-      <div class="effect-king preview-ember" data-effect="native-ember" data-label="Ember Glow">
-        <img src="../assets/Set2/wk.png" class="effect-preview" />
-      </div>
-      <div class="effect-king preview-frost" data-effect="native-frost" data-label="Frost Aura">
-        <img src="../assets/Set2/wk.png" class="effect-preview" />
-      </div>
-      <div class="effect-king preview-neon" data-effect="native-neon" data-label="Neon Pulse">
-        <img src="../assets/Set2/wk.png" class="effect-preview" />
-      </div>
-      <div class="effect-king preview-legendary" data-effect="legendary-ember" data-label="Legendary Ember">
-        <img src="../assets/Set2/wk.png" class="effect-preview" />
-      </div>
-      <div class="effect-king preview-minimal" data-effect="minimal" data-label="Minimal Halo">
-        <img src="../assets/Set2/wk.png" class="effect-preview" />
-      </div>
+  <!-- Performance -->
+  <section class="card" id="perf-card">
+    <div class="card-head">
+      <span class="overline">Performance</span>
+      <span class="perf-hint mono" id="perf-hint" data-testid="perf-hint">AUTO</span>
     </div>
-  </div>
-
-  <div class="glow-intensity-control disabled">
-    <span>Glow Intensity</span>
-    <div class="slider-container">
-      <input type="range" id="glow-intensity" min="0.1" max="1.5" step="0.1" value="1" class="slider-input">
-      <span class="intensity-value">100%</span>
+    <div class="segmented" data-testid="performance-mode-selector">
+      <button type="button" class="seg-btn mono" data-mode="auto" data-testid="performance-auto-btn">AUTO</button>
+      <button type="button" class="seg-btn mono seg-low" data-mode="low" data-testid="performance-low-btn">LOW</button>
+      <button type="button" class="seg-btn mono seg-med" data-mode="medium" data-testid="performance-medium-btn">MED</button>
+      <button type="button" class="seg-btn mono seg-high" data-mode="high" data-testid="performance-high-btn">HIGH</button>
     </div>
-  </div>
+    <p class="perf-desc" id="perf-desc">Detects your hardware and picks the best preset automatically.</p>
+  </section>
 
-  <div class="target-toggle disabled">
-    <span>Glow Target</span>
-    <div class="target-buttons">
-      <button type="button" class="target-button" data-target="all">All Pieces</button>
-      <button type="button" class="target-button" data-target="royal">King + Queen</button>
+  <!-- Skins -->
+  <section class="card gated">
+    <div class="card-head"><span class="overline">Piece Skins</span></div>
+    <div id="skins-container" data-testid="skin-picker-container"></div>
+  </section>
+
+  <!-- Glow -->
+  <section class="card gated">
+    <div class="card-head">
+      <span class="overline">Glow Effect</span>
+      <span class="mono micro accent" id="effect-name" data-testid="active-effect-name">OFF</span>
     </div>
-  </div>
 
-  <div class="board-styles-control disabled">
-    <span>Board Style</span>
-    <div class="board-buttons">
-      <button type="button" class="board-button" data-board="default">Classic</button>
-      <button type="button" class="board-button" data-board="marble">Marble</button>
-      <button type="button" class="board-button" data-board="forest">Forest</button>
-      <button type="button" class="board-button" data-board="neon">Neon</button>
-      <button type="button" class="board-button" data-board="twilight">Twilight</button>
+    <div class="effects-row" data-testid="effects-row">
+      <button type="button" class="effect-chip fx-ember" data-effect="native-ember" data-testid="effect-ember-btn">
+        <img src="../assets/Set2/wk.png" alt="" class="effect-img" /><span>Ember</span>
+      </button>
+      <button type="button" class="effect-chip fx-frost" data-effect="native-frost" data-testid="effect-frost-btn">
+        <img src="../assets/Set2/wk.png" alt="" class="effect-img" /><span>Frost</span>
+      </button>
+      <button type="button" class="effect-chip fx-neon" data-effect="native-neon" data-testid="effect-neon-btn">
+        <img src="../assets/Set2/wk.png" alt="" class="effect-img" /><span>Neon</span>
+      </button>
+      <button type="button" class="effect-chip fx-legend" data-effect="legendary-ember" data-testid="effect-legendary-btn">
+        <img src="../assets/Set2/wk.png" alt="" class="effect-img" /><span>Legend</span>
+      </button>
+      <button type="button" class="effect-chip fx-minimal" data-effect="minimal" data-testid="effect-minimal-btn">
+        <img src="../assets/Set2/wk.png" alt="" class="effect-img" /><span>Halo</span>
+      </button>
     </div>
-  </div>
 
-  <!-- Визуальные эффекты (частицы + трещины) -->
-  <div class="animations-control disabled">
-    <span>Visual Effects</span>
-    <div class="animation-buttons">
-      <button type="button" class="animation-button" data-anim="particles" title="Particle effects on moves">Particles</button>
-      <button type="button" class="animation-button" data-anim="cracks" title="Crack effects on capture">Cracks</button>
+    <div class="slider-row">
+      <span class="label-sm">Intensity</span>
+      <input type="range" id="glow-intensity" min="0.1" max="1.5" step="0.1" value="1"
+             class="range" data-testid="glow-intensity-slider" />
+      <span class="mono intensity-value" id="intensity-value">100%</span>
     </div>
-  </div>
 
-  <!-- Отдельный блок для турнира и импорта/экспорта -->
-  <div class="extras-control disabled">
-    <span>Extras</span>
-    <div class="extras-buttons">
-      <button type="button" class="extras-button" data-extra="tournament" title="Random skin each game">Tournament Mode</button>
-      <button type="button" class="extras-button import-btn" title="Import skin from ZIP">Import Skin</button>
-      <button type="button" class="extras-button export-btn" title="Export current skin" disabled>Export Skin</button>
+    <div class="segmented two" data-testid="glow-target-selector">
+      <button type="button" class="seg-btn" data-target="all" data-testid="glow-target-all">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+        All pieces
+      </button>
+      <button type="button" class="seg-btn" data-target="royal" data-testid="glow-target-royal">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7Z"/><path d="M5 20h14"/></svg>
+        King + Queen
+      </button>
     </div>
-  </div>
+  </section>
 
+  <!-- Board -->
+  <section class="card gated">
+    <div class="card-head"><span class="overline">Board Theme</span></div>
+    <div class="board-grid" id="board-grid" data-testid="board-style-grid"></div>
+  </section>
+
+  <!-- Move FX -->
+  <section class="card gated">
+    <div class="card-head"><span class="overline">Move FX</span></div>
+    <div class="fx-grid">
+      <button type="button" class="fx-btn" id="btn-particles" data-testid="toggle-particles">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4 7 17M17 7l1.4-1.4"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Particles</span>
+      </button>
+      <button type="button" class="fx-btn" id="btn-cracks" data-testid="toggle-cracks">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>Cracks</span>
+      </button>
+    </div>
+    <p class="hint">Spawn at the destination square of every move. Capped per quality preset.</p>
+  </section>
+
+  <!-- Extras -->
+  <section class="card gated">
+    <div class="card-head"><span class="overline">Extras</span></div>
+    <div class="fx-grid">
+      <button type="button" class="fx-btn" id="btn-tournament" data-testid="toggle-tournament">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        <span>Tournament</span>
+      </button>
+      <button type="button" class="fx-btn" id="btn-import" data-testid="import-skin-btn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        <span>Import skin</span>
+      </button>
+    </div>
+    <p class="hint">Tournament = random skin every game. Import: drop a folder into <span class="mono">assets/</span> and register it in <span class="mono">skins.json</span>.</p>
+  </section>
+
+  <div class="toast mono" id="toast" data-testid="toast"></div>
+</div>
 <script src="popup.js"></script>
 </body>
 </html>
