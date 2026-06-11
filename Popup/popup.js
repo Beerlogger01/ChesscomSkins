@@ -70,7 +70,8 @@ const EFFECT_NAMES = {
   "minimal": "HALO"
 };
 
-// ---------- Hardware detection (mirrors content.js) ----------
+// ---------- Hardware detection ----------
+// NOTE: must stay in sync with detectQuality() in content.js
 function detectQuality() {
   const mem = navigator.deviceMemory || 8;
   const cores = navigator.hardwareConcurrency || 4;

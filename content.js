@@ -73,6 +73,7 @@ let BOARD_STYLES = {};
 let resolvedQuality = "medium";
 let sessionSkin = null;      // tournament pick for this page load
 let fpsProbeDone = false;
+let glowRafPending = false;
 
 const styleTags = {};        // key -> <style> element
 
@@ -621,7 +622,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ resolvedQuality, perfMode: state.perfMode, enabled: state.enabled });
   } else if (request.action === "setGlowIntensity") {
     state.glowIntensity = Math.max(0.1, Math.min(1.5, parseFloat(request.intensity) || 1));
-    applyEffect();
+    // rAF-throttle: the popup slider can fire dozens of times per second
+    if (!glowRafPending) {
+      glowRafPending = true;
+      requestAnimationFrame(() => { glowRafPending = false; applyEffect(); });
+    }
     sendResponse({ success: true });
   }
   return true;
