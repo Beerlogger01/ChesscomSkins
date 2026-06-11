@@ -1,0 +1,93 @@
+{
+  "theme": "Dark",
+  "archetype": "Archetype 2: The Performance Pro (Command Center)",
+  "rationale": "The user requested a 'candy' (highly polished masterpiece) UI that also solves a critical performance issue for weak laptops. The 'Performance Pro' archetype aligns perfectly by focusing on tactical minimalism, elite precision, and clear performance controls. It uses deep obsidian backgrounds with high-contrast electric accents to feel like a premium gaming command center, solving the lag issue not just technically, but aesthetically.",
+  "colors": {
+    "background": "#09090B",
+    "surface": "#18181B",
+    "surface_hover": "#27272A",
+    "border": "rgba(255, 255, 255, 0.08)",
+    "border_focus": "rgba(6, 182, 212, 0.5)",
+    "text_primary": "#FAFAFA",
+    "text_secondary": "#A1A1AA",
+    "accent": "#06B6D4",
+    "accent_hover": "#0891B2",
+    "accent_glow": "rgba(6, 182, 212, 0.3)",
+    "danger": "#EF4444",
+    "warning": "#F59E0B",
+    "success": "#10B981"
+  },
+  "typography": {
+    "fonts": {
+      "heading": "'Outfit', sans-serif",
+      "body": "'Outfit', sans-serif",
+      "mono": "'JetBrains Mono', monospace"
+    },
+    "scale": {
+      "h1": "20px",
+      "h2": "14px",
+      "body": "13px",
+      "small": "11px",
+      "micro": "9px"
+    },
+    "rules": [
+      "Use 'JetBrains Mono' for all performance metrics, slider values, mode labels, and badges to give a technical feel.",
+      "Headings should have tight tracking (-0.02em) and utilize uppercase styling for overlines/labels.",
+      "Always import fonts via Google Fonts @import in the CSS."
+    ]
+  },
+  "layout_and_spacing": {
+    "width": "420px",
+    "padding": "16px",
+    "gap": "12px",
+    "border_radius": {
+      "container": "16px",
+      "element": "8px",
+      "button": "8px"
+    },
+    "grid_strategy": "Use a dense 'Bento Box' grid approach. The popup should be compact. Utilize 2-column CSS grids (`grid-template-columns: 1fr 1fr`) for toggles and segmented controls. Avoid long vertical scrolls by using horizontal scrolling for skin pickers if needed, or tight bento tiles."
+  },
+  "components": {
+    "master_toggle": {
+      "style": "Neumorphic/Tactical switch. Integrated directly into the top header. Active state glows with `accent_glow`.",
+      "testid": "master-toggle"
+    },
+    "performance_selector": {
+      "type": "Segmented Control",
+      "description": "CRITICAL NEW FEATURE to solve the user's lag issue.",
+      "style": "A 4-segment pill/bento box (Auto, Low, Med, High). Active segment uses solid accent color or distinct colors (Low=Success Green, Med=Warning Yellow, High=Danger Red/Max Glow). Font: JetBrains Mono.",
+      "testid": "performance-mode-selector"
+    },
+    "skin_picker": {
+      "type": "Compact Grid or Horizontal Scroll",
+      "style": "Dark tiles with 1px border. The piece previews sit inside a darker inset box (`#09090B`). Hover effect: slight scale up and border highlight.",
+      "testid": "skin-picker-container"
+    },
+    "glow_slider": {
+      "style": "Linear gradient track. Thumb is a crisp circle with a drop-shadow. The % value must be right-aligned in JetBrains Mono.",
+      "testid": "glow-intensity-slider"
+    },
+    "toggles": {
+      "style": "Bento style rectangular buttons with inline SVG icons. 1px solid border when inactive, filled with a subtle accent background (`rgba(6,182,212,0.1)`) and solid accent border when active.",
+      "testids": ["toggle-particles", "toggle-cracks", "toggle-tournament", "toggle-glow-target"]
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": "Use pure CSS variables. Cards should be flat `#18181B` with `1px solid rgba(255,255,255,0.08)`. No muddy grey transparency.",
+    "shadows": "Replace soft drop shadows with 'Tactical Minimalism': 1px inner highlights and solid sharp borders.",
+    "animations": "Keep animations lightweight (important for the 'lag' context). Use `transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1)`. Interactive elements scale to `0.97` on `:active`."
+  },
+  "media_and_icons": {
+    "icons_strategy": "Use inline SVG icons (e.g., Lucide icons copied directly into the HTML/JS) to maintain a zero-dependency, fast-loading popup.",
+    "image_urls": [],
+    "notes": "No external heavy images. Rely on the user's existing piece PNGs and pure CSS/SVG geometry."
+  },
+  "instructions_to_main_agent": [
+    "1. COMPLETE REWRITE: Rewrite `popup.html` and `popup.css` using the Dark 'Bento Box' Command Center theme. Do NOT use Tailwind CSS build tools; use vanilla CSS with CSS Variables mapped to the colors in this guideline.",
+    "2. ADD PERFORMANCE SELECTOR: Implement the new 'Performance Mode' (Auto / Low / Medium / High). In `popup.html` add the UI, and in `popup.js` map it to `chrome.storage.sync`. You must also update `content.js` / `content-script.js` so that if Performance = Low, particle limits are heavily reduced and CSS blur radiuses are halved or disabled.",
+    "3. ICONS: Add beautiful inline SVGs for 'Particles', 'Cracks', 'Tournament', and 'Target' buttons.",
+    "4. TYPOGRAPHY: Add `@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;700&display=swap');` to the CSS.",
+    "5. TEST IDs: Ensure ALL buttons, inputs, and interactive wrappers have a `data-testid` attribute (e.g., `data-testid=\"performance-low-btn\"`).",
+    "6. OPTIMIZATION: Ensure the popup itself does not use heavy CSS filters that would lag the popup. Keep the popup rendering cheap (use `translateZ(0)` on animated parts)."
+  ]
+}
